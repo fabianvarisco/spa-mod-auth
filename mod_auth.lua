@@ -44,13 +44,46 @@ local function get_afip_token_sing(opts)
         return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid token: " .. err
     end
 
+    local xml2lua = require("xml2lua")
+    local handler = require("xmlhandler.tree")
+
+    local parser = xml2lua.parser(handler)
+    parser:parse(sso_xml)
+
+    local sso = handler.root.sso
+
+    if not sso then
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.xml"
+    end
+
+    local version = sso._attr.version
+    local id = sso.id
+    local operation = id.operation
+    local login = operation.login
+
+    if not version then
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.version"
+    end
+
+    if not id then
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.id"
+    end
+
+    if not operation then
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.id.operation"
+    end
+
+    if not login then
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.id.operation.login"
+    end
+
     return sso_xml, sign, nil, nil
 end
 
 function mod_auth.authenticate(opts)
     ngx.log(ngx.INFO, "about executing afip.mod_auth.authenticate...")
 
-    local sso_xml, sign, status, err = get_afip_token_sing(opts)
+    local sso, sign, status, err = get_afip_token_sing(opts)
 
     if err then
         ngx.status = status
@@ -59,7 +92,7 @@ function mod_auth.authenticate(opts)
         return
     end
 
-    ngx.say("sso.xml [" , sso_xml , "]")
+    ngx.say("sso.xml [" , sso , "]")
     ngx.say("sign [" , sign , "]")
     ngx.say("OK")
 end
