@@ -1,0 +1,30 @@
+<sso version="2.0">
+    <id src="xxx" dst="xxx" exp_time="xxx" get_time="xxx">
+        <operation type="login">
+            <login service="service" authmethod="xxx" entity="xxx" uid="20123412349">
+                <info name="departmentNumber" value="" />
+                <info name="ou" value="" />
+                <info name="cn" value="" />
+                <info name="codigoLegajo" value="" />
+                <info name="cuil" value="" />
+                <info name="usename" value="" />
+                <info name="departmentNumber" value="" />
+                <relations>
+                    <relation key="20123456789" />
+                    <relation key="20123456219" />
+                    <relation key="20123122119" />
+                </relations>
+                <groups>
+                    <group name="group1" />
+                    <group name="group2" />
+                    <group name="group3" />
+                </groups>
+                <servicedata>
+                   <![CDATA[
+                    xxxxx
+                    ]]>
+                </servicedata>
+            </login>
+        </operation>
+    </id>
+</sso>

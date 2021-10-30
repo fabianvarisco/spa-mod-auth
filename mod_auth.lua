@@ -1,48 +1,18 @@
 local mod_auth = {}
 
--- main routine
-local function xx(opts)
-    ngx.req.read_body()
-    local args, err = ngx.req.get_post_args()
-
-    if err then
-        ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
-        ngx.say(err)
-        ngx.exit(ngx.status)
+local function decode(value)
+    if value:find(' ') then
+        value = value:gsub(' ', '+')
+    elseif value:find('-') then
+        value = value:gsub('-', '+')
     end
 
-    if not args then
-        ngx.status = ngx.HTTP_BAD_REQUEST
-        ngx.say("No post args")
-        ngx.exit(ngx.status)
+    local ret = ngx.decode_base64(value)
+    if not ret then
+        return nil, "Invalid encoding [" .. value .. "]"
     end
 
-    local token = args["token"]
-    local sign = args["sign"]
-
-    if not token then
-        ngx.status = ngx.HTTP_BAD_REQUEST
-        ngx.say("Empty token")
-        ngx.exit(ngx.status)
-    end
-
-    if not sign then
-        ngx.status = ngx.HTTP_BAD_REQUEST
-        ngx.say("Empty sign")
-        ngx.exit(ngx.status)
-    end
-
-    ngx.say("token [", token, "]")
-
-    local sso_xml = ngx.decode_base64(token)
-
-    if not sso_xml then
-        ngx.status = ngx.HTTP_BAD_REQUEST
-        ngx.say("Invalid base64 token")
-        ngx.exit(ngx.status)
-    end
-
-    return sso_xml, sign, err
+    return ret, nil
 end
 
 local function get_afip_token_sing(opts)
@@ -68,10 +38,10 @@ local function get_afip_token_sing(opts)
         return nil, nil, ngx.HTTP_BAD_REQUEST, "Empty sign"
     end
 
-    local sso_xml = ngx.decode_base64(token)
+    local sso_xml, err = decode(token)
 
-    if not sso_xml then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid encoded token"
+    if err then
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid token: " .. err
     end
 
     return sso_xml, sign, nil, nil
