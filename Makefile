@@ -6,8 +6,8 @@ run:
 
 dev: clean
 	docker run -d --name app --net host -p 127.0.0.1:8000:8000 \
-		-v `pwd`:/usr/local/openresty/nginx/conf/ \
-		-v `pwd`:/usr/local/openresty/lualib/afip/ \
+		-v `pwd`/nginx/conf:/usr/local/openresty/nginx/conf/ \
+		-v `pwd`/lualib/afip:/usr/local/openresty/lualib/afip/ \
 		app:3
 
 clean:
