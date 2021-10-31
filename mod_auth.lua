@@ -56,28 +56,19 @@ local function get_afip_token_sing(opts)
         return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.xml"
     end
 
-    local version = sso._attr.version
-    local id = sso.id
-    local operation = id.operation
-    local login = operation.login
-
-    if not version then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.version"
-    end
-
-    if not id then
+    if not sso.id then
         return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.id"
     end
 
-    if not operation then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.id.operation"
+    if not sso.operation then
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.operation"
     end
 
-    if not login then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.id.operation.login"
+    if not sso.operation.login then
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.operation.login"
     end
 
-    return sso_xml, sign, nil, nil
+    return sso, sign, nil, nil
 end
 
 function mod_auth.authenticate(opts)
@@ -92,7 +83,9 @@ function mod_auth.authenticate(opts)
         return
     end
 
-    ngx.say("sso.xml [" , sso , "]")
+    local JSON = require("afip.JSON")
+
+    ngx.say("sso [" , JSON:encode(sso), "]")
     ngx.say("sign [" , sign , "]")
     ngx.say("OK")
 end
