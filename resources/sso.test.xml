@@ -1,30 +1,41 @@
+<?xml version="1.0"?>
 <sso version="2.0">
-    <id src="xxx" dst="xxx" exp_time="xxx" get_time="xxx">
-        <operation type="login">
-            <login service="service" authmethod="xxx" entity="xxx" uid="20123412349">
-                <info name="departmentNumber" value="" />
-                <info name="ou" value="" />
-                <info name="cn" value="" />
-                <info name="codigoLegajo" value="" />
-                <info name="cuil" value="" />
-                <info name="usename" value="" />
-                <info name="departmentNumber" value="" />
-                <relations>
-                    <relation key="20123456789" />
-                    <relation key="20123456219" />
-                    <relation key="20123122119" />
-                </relations>
-                <groups>
-                    <group name="group1" />
-                    <group name="group2" />
-                    <group name="group3" />
-                </groups>
-                <servicedata>
-                   <![CDATA[
-                    xxxxx
-                    ]]>
-                </servicedata>
-            </login>
-        </operation>
-    </id>
+<id
+src="cn=AuthServerInt, ou=DESEIN, o=AFIP, c=AR"
+dst="cn=service-name, ou=XXXX, o=AFIP, c=AR"
+unique_id="oiuoiuoiuoiu"
+exp_time="1590410760"
+get_time="1590410760"
+/>
+<operation type="login" value="granted">
+<login
+service="service"
+entity="33693450239"
+uid="20123412349"
+authmethod="passphrase"
+regmethod="3"
+>
+<info name="departmentNumber" value="AAB00001" />
+<info name="ou" value="" />
+<info name="cn" value="CANTONA ERIC" />
+<info name="codigoLegajo" value="u123456" />
+<info name="cuil" value="20123412349" />
+<info name="usename" value="PEPE" />
+<relations>
+<relation key="20123456789" />
+<relation key="20123456219" />
+<relation key="20123122119" />
+</relations>
+<groups>
+<group name="group1" />
+<group name="group2" />
+<group name="group3" />
+</groups>
+<servicedata src="origin-service-name">
+<![CDATA[
+xxxxx
+]]>
+</servicedata>
+</login>
+</operation>
 </sso>
