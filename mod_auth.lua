@@ -52,6 +52,8 @@ local function get_afip_token_sing(opts)
 
     local sso = handler.root.sso
 
+    local sso_payload = {}
+
     if not sso then
         return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.xml"
     end
@@ -59,6 +61,25 @@ local function get_afip_token_sing(opts)
     if not sso.id then
         return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.id"
     end
+
+    if not sso.id._attr then
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "Empty sso.id"
+    end
+
+    if not sso.id._attr.src then
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "Empty sso.id.src"
+    end
+    sso_payload.src = sso.id._attr.src
+
+    if not sso.id._attr.dst then
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "Empty sso.id.dst"
+    end
+    sso_payload.dst = sso.id._attr.dst
+
+    if not sso.id._attr.exp_time then
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "Empty sso.id.exp_time"
+    end
+    sso_payload.exp_time = sso.id._attr.exp_time
 
     if not sso.operation then
         return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.operation"
@@ -68,7 +89,21 @@ local function get_afip_token_sing(opts)
         return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.operation.login"
     end
 
-    return sso, sign, nil, nil
+    if sso.operation.login._attr and sso.operation.login._attr.uid then
+        sso_payload.uid = sso.operation.login._attr.uid
+    end
+    local login = sso.operation.login
+
+    sso_payload.groups = {}
+    if login.groups and login.groups.group and #login.groups.group > 1 then
+        for i, group in pairs(login.groups.group) do
+            if group._attr then
+                sso_payload.groups[i] = group._attr.name
+            end
+        end
+    end
+
+    return sso_payload, sign, nil, nil
 end
 
 function mod_auth.authenticate(opts)
