@@ -103,6 +103,15 @@ local function get_afip_token_sing(opts)
         end
     end
 
+    sso_payload.relations = {}
+    if login.relations and login.relations.relation and #login.relations.relation > 1 then
+        for i, rel in pairs(login.relations.relation) do
+            if rel._attr then
+                sso_payload.relations[i] = rel._attr.key
+            end
+        end
+    end
+
     return sso_payload, sign, nil, nil
 end
 
