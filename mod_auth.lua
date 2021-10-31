@@ -95,7 +95,7 @@ local function get_afip_token_sing(opts)
     local login = sso.operation.login
 
     sso_payload.groups = {}
-    if login.groups and login.groups.group and #login.groups.group > 1 then
+    if login.groups and login.groups.group then
         for i, group in pairs(login.groups.group) do
             if group._attr and group._attr.name then
                 sso_payload.groups[i] = group._attr.name
@@ -104,7 +104,7 @@ local function get_afip_token_sing(opts)
     end
 
     sso_payload.relations = {}
-    if login.relations and login.relations.relation and #login.relations.relation > 1 then
+    if login.relations and login.relations.relation then
         for i, rel in pairs(login.relations.relation) do
             if rel._attr and rel._attr.key then
                 sso_payload.relations[i] = rel._attr.key
