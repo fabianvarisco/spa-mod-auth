@@ -47,8 +47,8 @@ local function get_afip_token_sing(opts)
     end
 
     local xml2lua = require("xml2lua")
-    local handler = require("xmlhandler.tree")
-
+    -- https://github.com/manoelcampos/xml2lua/issues/29
+    local handler = require("xmlhandler.tree"):new()
     local parser = xml2lua.parser(handler)
     parser:parse(sso_xml)
 
@@ -58,11 +58,6 @@ local function get_afip_token_sing(opts)
     end
 
     if not sso.id then
-        ngx.log(ngx.ERR, "=============== invalid sso.id ==============")
-        ngx.log(ngx.ERR, "token [" .. token .. "]")
-        ngx.log(ngx.ERR, "sso_xml [" .. sso_xml .. "]")
-        local JSON = require("afip.JSON")
-        ngx.log(ngx.ERR, "sso [" , JSON:encode(sso), "]")
         return nil, nil, ngx.HTTP_BAD_REQUEST, "invalid sso.id"
     end
 
