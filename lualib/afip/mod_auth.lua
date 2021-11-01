@@ -22,7 +22,7 @@ local function check_exp_time(exp_time, opts)
     end
 
     local slack = 120
-    if opts and type(opts.intial_slack) == "number" then
+    if opts and type(opts.initial_slack) == "number" then
         slack = opts.slack
     end
 
