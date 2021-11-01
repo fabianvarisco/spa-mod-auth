@@ -4,8 +4,8 @@
 src="cn=AuthServerInt, ou=DESEIN, o=AFIP, c=AR"
 dst="cn=service-name, ou=XXXX, o=AFIP, c=AR"
 unique_id="oiuoiuoiuoiu"
-exp_time="1590410760"
-gen_time="1590410760"
+exp_time="{{EXP_TIME}}"
+gen_time="{{GEN_TIME}}"
 />
 <operation type="login" value="granted">
 <login
