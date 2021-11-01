@@ -1,7 +1,13 @@
 #!/bin/bash
 
-sso_xml="$(cat ./resources/sso.test.xml)"
-readonly sso_xml
+readonly SSO_TEST_XML="./resources/sso.test.xml"
+
+readonly EXAMPLE_KEY_PEM="./resources/www.example.com.key.pem"
+
+rm -f ./tmp/sso.xml
+rm -f ./tmp/sso.xml.base64
+rm -f ./tmp/sign
+rm -f ./tmp/sign.base64
 
 gen_time=$(date +%s)
 readonly gen_time
@@ -9,13 +15,16 @@ readonly gen_time
 exp_time=$(( gen_time + 60 ))
 readonly exp_time
 
-sso_xml_b64=$(echo "${sso_xml}" | \
-              sed "s/{{GEN_TIME}}/${gen_time}/" | \
-              sed "s/{{EXP_TIME}}/${exp_time}/" | \
-              base64 -w 0 | sed 's/+/-/g' | tr -d '=')
-readonly sso_xml_b64
+sed "s/{{GEN_TIME}}/${gen_time}/" "$SSO_TEST_XML" | \
+sed "s/{{EXP_TIME}}/${exp_time}/" > ./tmp/sso.xml
 
-data="foo=foo&bar=bar&token=${sso_xml_b64}&sign=XXXXX"
+openssl dgst -sha256 -sign "$EXAMPLE_KEY_PEM" -out ./tmp/sign ./tmp/sso.xml
+
+for file in sso.xml sign; do
+    base64 -w 0 "./tmp/$file" | sed 's/+/-/g' | tr -d '=' > "./tmp/$file.base64"
+done
+
+data="foo=foo&bar=bar&token=$(cat ./tmp/sso.xml.base64)&sign=$(cat ./tmp/sign.base64)"
 readonly data
 
 set -x
