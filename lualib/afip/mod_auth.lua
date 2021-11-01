@@ -1,10 +1,10 @@
 local mod_auth = {}
 
 local function decode(value)
-    if value:find(' ') then
-        value = value:gsub(' ', '+')
-    elseif value:find('-') then
-        value = value:gsub('-', '+')
+    for _, c in ipairs({' ', '-'}) do
+        if value:find(c) then
+            value = value:gsub(c, '+')
+        end
     end
 
     local ret = ngx.decode_base64(value)
@@ -51,21 +51,19 @@ local function get_afip_token_sing(opts)
     parser:parse(sso_xml)
 
     local sso = handler.root.sso
-
-    local sso_payload = {}
-
     if not sso then
         return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.xml"
     end
 
     if not sso.id then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.id"
+        return sso, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.id"
     end
 
     if not sso.id._attr then
         return nil, nil, ngx.HTTP_BAD_REQUEST, "Empty sso.id"
     end
 
+    local sso_payload = {}
     if not sso.id._attr.src then
         return nil, nil, ngx.HTTP_BAD_REQUEST, "Empty sso.id.src"
     end
@@ -112,9 +110,16 @@ local function get_afip_token_sing(opts)
         end
     end
 
-    if login.info and #login.info > 1 then
+    if login.info then
         sso_payload.info = {}
-        for i, info in pairs(login.info) do
+        if #login.info > 1 then
+            for _, info in pairs(login.info) do
+                if info._attr and info._attr.name and info._attr.value then
+                    sso_payload.info[info._attr.name] = info._attr.value
+                end
+            end
+        else
+            local info = login.info
             if info._attr and info._attr.name and info._attr.value then
                 sso_payload.info[info._attr.name] = info._attr.value
             end
@@ -129,14 +134,17 @@ function mod_auth.authenticate(opts)
 
     local sso, sign, status, err = get_afip_token_sing(opts)
 
+    local JSON = require("afip.JSON")
+
     if err then
         ngx.status = status
         ngx.say(err)
+        if sso then
+            ngx.say("sso [" , JSON:encode(sso), "]")
+        end
         ngx.exit(ngx.status)
         return
     end
-
-    local JSON = require("afip.JSON")
 
     ngx.say("sso [" , JSON:encode(sso), "]")
     ngx.say("sign [" , sign , "]")
