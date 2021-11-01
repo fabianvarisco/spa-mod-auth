@@ -15,6 +15,23 @@ local function decode(value)
     return ret, nil
 end
 
+local function check_exp_time(exp_time, opts)
+    local exp_time_number = tonumber(exp_time, 10)
+    if not exp_time then
+        return "exp_time: invalid number [" .. (exp_time or "nil") .. "]"
+    end
+
+    local slack = 120
+    if opts and type(opts.intial_slack) == "number" then
+        slack = opts.slack
+    end
+
+    if exp_time_number > (ngx.time() + slack) then
+        return "sso token not yet valid: exp_time[" .. exp_time .. "] ngx.time() [" .. ngx.time() .. " intial_slack [" .. slack .. "]"
+    end
+    return nil --OK!
+end
+
 local function get_afip_token_sing(opts)
     ngx.req.read_body()
     local args, err = ngx.req.get_post_args()
@@ -80,6 +97,11 @@ local function get_afip_token_sing(opts)
         return nil, nil, ngx.HTTP_BAD_REQUEST, "empty sso.id.exp_time"
     end
     sso_payload.exp_time = sso.id._attr.exp_time
+
+    err = check_exp_time(sso_payload.exp_time, opts)
+    if err then
+        return nil, nil, ngx.HTTP_BAD_REQUEST, err
+    end
 
     if not sso.operation then
         return nil, nil, ngx.HTTP_BAD_REQUEST, "invalid sso.operation"
