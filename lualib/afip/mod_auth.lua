@@ -9,7 +9,7 @@ local function decode(value)
 
     local ret = ngx.decode_base64(value)
     if not ret then
-        return nil, "Invalid encoding [" .. value .. "]"
+        return nil, "not well formed base64 [" .. value .. "]"
     end
 
     return ret, nil
@@ -24,24 +24,26 @@ local function get_afip_token_sing(opts)
     end
 
     if not args then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "No post args"
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "no post args"
     end
 
     local token = args["token"]
     local sign = args["sign"]
 
     if not token then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "Empty token"
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "empty token"
     end
 
     if not sign then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "Empty sign"
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "empty sign"
     end
 
     local sso_xml, err = decode(token)
-
     if err then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid token: " .. err
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "invalid token: " .. err
+    end
+    if not sso_xml:find("^<") then
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "invalid xml token: does not start with <"
     end
 
     local xml2lua = require("xml2lua")
@@ -52,39 +54,44 @@ local function get_afip_token_sing(opts)
 
     local sso = handler.root.sso
     if not sso then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.xml"
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "invalid sso.xml"
     end
 
     if not sso.id then
-        return sso, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.id"
+        ngx.log(ngx.ERR, "=============== invalid sso.id ==============")
+        ngx.log(ngx.ERR, "token [" .. token .. "]")
+        ngx.log(ngx.ERR, "sso_xml [" .. sso_xml .. "]")
+        local JSON = require("afip.JSON")
+        ngx.log(ngx.ERR, "sso [" , JSON:encode(sso), "]")
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "invalid sso.id"
     end
 
     if not sso.id._attr then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "Empty sso.id"
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "empty sso.id"
     end
 
     local sso_payload = {}
     if not sso.id._attr.src then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "Empty sso.id.src"
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "empty sso.id.src"
     end
     sso_payload.src = sso.id._attr.src
 
     if not sso.id._attr.dst then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "Empty sso.id.dst"
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "empty sso.id.dst"
     end
     sso_payload.dst = sso.id._attr.dst
 
     if not sso.id._attr.exp_time then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "Empty sso.id.exp_time"
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "empty sso.id.exp_time"
     end
     sso_payload.exp_time = sso.id._attr.exp_time
 
     if not sso.operation then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.operation"
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "invalid sso.operation"
     end
 
     if not sso.operation.login then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "Invalid sso.operation.login"
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "invalid sso.operation.login"
     end
 
     if sso.operation.login._attr and sso.operation.login._attr.uid then
@@ -110,6 +117,10 @@ local function get_afip_token_sing(opts)
         end
     end
 
+    if #sso_payload.relations == 0 and #sso_payload.groups == 0 then
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "sso.operation.login without relations and groups"
+    end
+
     if login.info then
         sso_payload.info = {}
         if #login.info > 1 then
@@ -133,19 +144,14 @@ function mod_auth.authenticate(opts)
     ngx.log(ngx.INFO, "about executing afip.mod_auth.authenticate...")
 
     local sso, sign, status, err = get_afip_token_sing(opts)
-
-    local JSON = require("afip.JSON")
-
     if err then
         ngx.status = status
         ngx.say(err)
-        if sso then
-            ngx.say("sso [" , JSON:encode(sso), "]")
-        end
         ngx.exit(ngx.status)
         return
     end
 
+    local JSON = require("afip.JSON")
     ngx.say("sso [" , JSON:encode(sso), "]")
     ngx.say("sign [" , sign , "]")
     ngx.say("OK")

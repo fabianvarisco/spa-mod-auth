@@ -18,7 +18,7 @@ reload:
 	docker exec -it app /usr/local/openresty/nginx/sbin/nginx -s reload
 
 logs:
-	docker exec -it app tail -f /usr/local/openresty/nginx/error.log
+	docker exec -it app tail -1000 -f /usr/local/openresty/nginx/error.log
 
 get:
 	curl -i localhost:8000/json
@@ -29,14 +29,6 @@ post:
 post-invalid:
 	curl -H "Content-Type: application/json" -X POST -d '{"id": 1, "username":"xyz","pass:}' localhost:8000/json
 
-sso:
-	rm -f ./resources/sso.xml.b64
-	echo '<sso at1="pepe"><t1><t2 at2="coco"/></t1></sso>' | base64 > ./resources/sso.xml.b64
-
-var_token=$(echo '<sso at1="pepe"><t1><t2 at2="coco"/></t1></sso>' | base64)
-
 login:
 	curl --data 'foo=bar&bar=baz&bar=blah&sign=XXXX&token=${var_token}' localhost:8000/login
 
-pepe:
-	echo "var_token: ${var_token}"
