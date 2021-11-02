@@ -9,3 +9,5 @@ https://openresty-reference.readthedocs.io/en/latest/Lua_Nginx_API/#ngxreqget_po
 http://regex.info/blog/lua/json
 
 https://github.com/manoelcampos/xml2lua
+
+https://openresty.org/download/agentzh-nginx-tutorials-en.html
