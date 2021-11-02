@@ -6,6 +6,8 @@ run:
 
 dev: clean
 	docker run -d --name app --net host -p 127.0.0.1:8000:8000 \
+	    -e INITIAL_SLACK_SECONDS=60 \
+	    -e CRYPTO_CONFIG_PATH=/crypto-config/ \
 		-v `pwd`/nginx/conf:/usr/local/openresty/nginx/conf/ \
 		-v `pwd`/lualib/afip:/usr/local/openresty/lualib/afip/ \
 		app:3
@@ -31,4 +33,3 @@ post-invalid:
 
 login:
 	curl --data 'foo=bar&bar=baz&bar=blah&sign=XXXX&token=${var_token}' localhost:8000/login
-

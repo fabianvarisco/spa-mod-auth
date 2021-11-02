@@ -1,15 +1,15 @@
 <?xml version="1.0"?>
 <sso version="2.0">
 <id
-src="cn=AuthServerInt, ou=DESEIN, o=AFIP, c=AR"
-dst="cn=service-name, ou=XXXX, o=AFIP, c=AR"
+src="cn={{AUTH_SERVER_CN}}, ou=DESEIN, o=AFIP, c=AR"
+dst="cn={{SERVICE_CN}}, ou=XXXX, o=AFIP, c=AR"
 unique_id="oiuoiuoiuoiu"
 exp_time="{{EXP_TIME}}"
 gen_time="{{GEN_TIME}}"
 />
 <operation type="login" value="granted">
 <login
-service="service"
+service="{{SERVICE_CN}}"
 entity="33693450239"
 uid="20123412349"
 authmethod="passphrase"
