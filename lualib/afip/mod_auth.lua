@@ -21,13 +21,9 @@ local function check_exp_time(exp_time, opts)
         return "exp_time: invalid number [" .. (exp_time or "nil") .. "]"
     end
 
-    local slack = 120
-    if opts and type(opts.initial_slack) == "number" then
-        slack = opts.slack
-    end
-
+    local slack = opts.INITIAL_SLACK_SECONDS
     if exp_time_number > (ngx.time() + slack) then
-        return "sso token not yet valid: exp_time[" .. exp_time .. "] ngx.time() [" .. ngx.time() .. " intial_slack [" .. slack .. "]"
+        return "sso token not yet valid: exp_time[" .. exp_time .. "] ngx.time() [" .. ngx.time() .. " opts.INITIAL_SLACK_SECONDS [" .. slack .. "]"
     end
     return nil --OK!
 end
@@ -157,8 +153,18 @@ local function get_afip_token_sing(opts)
     return sso_payload, sign, nil, nil
 end
 
-function mod_auth.authenticate(opts)
+function mod_auth.authenticate()
+    local JSON = require("afip.JSON")
+
+    local opts = {}
+    opts.INITIAL_SLACK_SECONDS   = os.getenv("INITIAL_SLACK_SECONDS")   or 120
+    opts.CRYPTO_CONFIG_DIR       = os.getenv("CRYPTO_CONFIG_DIR")       or "/secrets"
+    opts.MY_PRIVATE_KEY_PEM_PATH = os.getenv("MY_PRIVATE_KEY_PEM_PATH") or "/secrets/myprivate.key"
+    opts.MY_PUBLIC_KEY_PEM_PATH  = os.getenv("MY_PUBLIC_KEY_PEM_PATH")  or "/secrets/mypublic.key"
+
     ngx.log(ngx.INFO, "about executing afip.mod_auth.authenticate...")
+
+    ngx.log(ngx.INFO, "with options [" .. JSON:encode(opts) .. "]")
 
     local sso, sign, status, err = get_afip_token_sing(opts)
     if err then
@@ -168,7 +174,6 @@ function mod_auth.authenticate(opts)
         return
     end
 
-    local JSON = require("afip.JSON")
     ngx.say("sso [" , JSON:encode(sso), "]")
     ngx.say("sign [" , sign , "]")
     ngx.say("OK")
