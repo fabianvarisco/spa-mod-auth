@@ -106,11 +106,17 @@ local function get_afip_token_sing(opts)
     if not sso.operation.login then
         return nil, nil, ngx.HTTP_BAD_REQUEST, "invalid sso.operation.login"
     end
-
-    if sso.operation.login._attr and sso.operation.login._attr.uid then
-        sso_payload.uid = sso.operation.login._attr.uid
-    end
     local login = sso.operation.login
+
+    if not login._attr then
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "sso.operation.login without attributes"
+    end
+
+    if not login._attr.service then
+        return nil, nil, ngx.HTTP_BAD_REQUEST, "invalid sso.operation.login.service"
+    end
+    sso_payload.service = login._attr.service
+    sso_payload.uid     = login._attr.uid -- mandatory?
 
     sso_payload.groups = {}
     if login.groups and login.groups.group then
