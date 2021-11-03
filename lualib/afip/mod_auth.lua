@@ -73,7 +73,7 @@ local function get_authserver_publickey_pem(dn, opts)
 
     local publickey_pem = auth_servers_cache[service_name]
     if publickey_pem then
-        ngx.log(ngx.INFO, "got publickey_pem of [" .. service_name .. "] from cache")
+        ngx.log(ngx.INFO, "got [" .. service_name .. "] publickey_pem from cache")
         return publickey_pem
     end
 
@@ -82,8 +82,7 @@ local function get_authserver_publickey_pem(dn, opts)
         return nil, service_name .. ".publickey.pem not found"
     end
     auth_servers_cache[service_name] = content
-    ngx.log(ngx.INFO, "put publickey_pem of [" .. service_name .. "] into cache")
-    ngx.log(ngx.INFO, "publickey_pem of [" .. service_name .. "]: [" .. content .. "]")
+    ngx.log(ngx.INFO, "put [" .. service_name .. "] publickey_pem into cache [" .. content .. "]")
     return content
 end
 
