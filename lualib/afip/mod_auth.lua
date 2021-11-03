@@ -1,4 +1,8 @@
+local ngx = ngx
+local JSON = require("afip.JSON")
+
 local mod_auth = {}
+local auth_servers_cache = {}
 
 local function decode(value)
     for _, c in ipairs({' ', '-'}) do
@@ -28,6 +32,61 @@ local function check_exp_time(exp_time, opts)
     return nil --OK!
 end
 
+local function readAll(file)
+    local f = io.open(file, "rb")
+    if not f then
+        return nil, "file [" .. file .. "] not found"
+    end
+    local content = f:read("*all")
+    f:close()
+    return content, nil
+end
+
+local function split(input_str, sep)
+    local parts = {}
+    for part in string.gmatch(input_str, "([^" .. sep .. "]+)") do
+        table.insert(parts, part)
+    end
+    return parts
+end
+
+local function all_trim(input_str)
+    return input_str:match( "^%s*(.-)%s*$" )
+end
+
+local function get_cn_from_dn(dn)
+    local parts = split(dn, ",")
+    for _, part in ipairs(parts) do
+        local parts2 = split(part, "=")
+        if #parts2 == 2 and all_trim(parts2[1]) == "cn" then
+            return all_trim(parts2[2])
+        end
+    end
+    return nil
+end
+
+local function get_authserver_publickey_pem(dn, opts)
+    local service_name = get_cn_from_dn(dn)
+    if not service_name then
+        return nil, "dn [" .. dn .. "] without cn"
+    end
+
+    local publickey_pem = auth_servers_cache[service_name]
+    if publickey_pem then
+        ngx.log(ngx.INFO, "got publickey_pem of [" .. service_name .. "] from cache")
+        return publickey_pem
+    end
+
+    local content, err = readAll(opts.CRYPTO_CONFIG_DIR .. service_name .. ".publickey.pem")
+    if err then
+        return nil, service_name .. ".publickey.pem not found"
+    end
+    auth_servers_cache[service_name] = content
+    ngx.log(ngx.INFO, "put publickey_pem of [" .. service_name .. "] into cache")
+    ngx.log(ngx.INFO, "publickey_pem of [" .. service_name .. "]: [" .. content .. "]")
+    return content
+end
+
 local function get_afip_token_sing(opts)
     ngx.req.read_body()
     local args, err = ngx.req.get_post_args()
@@ -51,7 +110,8 @@ local function get_afip_token_sing(opts)
         return nil, nil, ngx.HTTP_BAD_REQUEST, "empty sign"
     end
 
-    local sso_xml, err = decode(token)
+    local sso_xml
+    sso_xml, err = decode(token)
     if err then
         return nil, nil, ngx.HTTP_BAD_REQUEST, "invalid token: " .. err
     end
@@ -83,6 +143,15 @@ local function get_afip_token_sing(opts)
         return nil, nil, ngx.HTTP_BAD_REQUEST, "empty sso.id.src"
     end
     sso_payload.src = sso.id._attr.src
+
+    local authserver_publickey_pem
+    authserver_publickey_pem, err = get_authserver_publickey_pem(sso_payload.src, opts)
+    if err then
+        return nil, nil, ngx.HTTP_BAD_REQUEST, err
+    end
+    if not authserver_publickey_pem then
+        return nil, nil, ngx.HTTP_INTERNAL_SERVER_ERROR, "not err and not authserver_publickey_pem !!!"
+    end
 
     if not sso.id._attr.dst then
         return nil, nil, ngx.HTTP_BAD_REQUEST, "empty sso.id.dst"
@@ -160,8 +229,6 @@ local function get_afip_token_sing(opts)
 end
 
 function mod_auth.authenticate()
-    local JSON = require("afip.JSON")
-
     local opts = {}
     opts.INITIAL_SLACK_SECONDS   = os.getenv("INITIAL_SLACK_SECONDS")   or 120
     opts.CRYPTO_CONFIG_DIR       = os.getenv("CRYPTO_CONFIG_DIR")       or "/secrets"
