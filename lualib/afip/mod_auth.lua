@@ -1,8 +1,12 @@
-local ngx = ngx
+local ngx  = ngx
 local JSON = require("afip.JSON")
 local PKEY = require("resty.openssl.pkey")
+local JWT  = require("resty.jwt")
+
+local JWT_SECRET_TXT = nil
+
 local INTERNAL_SERVER_ERROR = 500
-local BAD_REQUEST = 500
+local BAD_REQUEST           = 400
 
 local mod_auth = {}
 
@@ -75,6 +79,7 @@ local function get_authserver_publickey(dn, opts)
         return nil, "dn [" .. dn .. "] without cn"
     end
 
+    -- ToDo: cache by name
     local pkey = auth_servers_cache[service_name]
     if pkey then
         -- gx.log(ngx.INFO, "got [" .. service_name .. "] publickey_pem from cache")
@@ -121,7 +126,7 @@ local function get_afip_token_sing(opts)
     return token, sign, nil, nil
 end
 
-function mod_auth.validate_token_sign(token, sign, opts)
+local function validate_token_sign(token, sign, opts)
     local err
     if not token or type(token) ~= "string" then
         err = "param #1: token nil or not string"
@@ -210,9 +215,9 @@ function mod_auth.validate_token_sign(token, sign, opts)
     if not sso.id._attr.exp_time then
         return nil, BAD_REQUEST, "empty sso.id.exp_time"
     end
-    sso_payload.exp_time = sso.id._attr.exp_time
+    sso_payload.sso_exp_time = sso.id._attr.exp_time
 
-    err = check_exp_time(sso_payload.exp_time, opts)
+    err = check_exp_time(sso_payload.sso_exp_time, opts)
     if err then
         return nil, BAD_REQUEST, err
     end
@@ -277,12 +282,43 @@ function mod_auth.validate_token_sign(token, sign, opts)
     return sso_payload, nil, nil
 end
 
+local function load_JWT_SECRET_TXT(file)
+    if not JWT_SECRET_TXT then
+        local err
+        JWT_SECRET_TXT, err = readAll(file)
+        return err
+    end
+    return nil
+end
+
+local function make_jwt(payload, opts)
+    local now = ngx.time()
+    payload.iat = ngx.time()
+    payload.exp = payload.iat + opts.JWT_EXP_SECONDS
+
+    local assertion = {
+      header = { typ = "JWT", alg = "HS512" },
+      payload = payload
+    }
+
+    local err = load_JWT_SECRET_TXT(opts.JWT_SECRET_TXT)
+    if err or not JWT_SECRET_TXT then
+        return nil, nil, err or "not JWT_SECRET_TXT"
+    end
+
+    ngx.log(ngx.INFO, JSON:encode_pretty(assertion))
+
+    local jwt_token = JWT:sign(JWT_SECRET_TXT, assertion)
+
+    return jwt_token, assertion, nil
+end
+
 function mod_auth.authenticate()
     local opts = {}
-    opts.INITIAL_SLACK_SECONDS = os.getenv("INITIAL_SLACK_SECONDS")   or 120
-    opts.CRYPTO_CONFIG_DIR     = os.getenv("CRYPTO_CONFIG_DIR")       or "/secrets"
-    opts.MY_PRIVATE_KEY_PEM    = os.getenv("MY_PRIVATE_KEY_PEM") or "/secrets/myprivate.key"
-    opts.MY_PUBLIC_KEY_PEM     = os.getenv("MY_PUBLIC_KEY_PEM")  or "/secrets/mypublic.key"
+    opts.INITIAL_SLACK_SECONDS  = os.getenv("INITIAL_SLACK_SECONDS")   or 120
+    opts.CRYPTO_CONFIG_DIR      = os.getenv("CRYPTO_CONFIG_DIR")       or "/secrets"
+    opts.JWT_SECRET_TXT         = os.getenv("JWT_SECRET_TXT")          or "/secrets/jwtsecret.txt"
+    opts.JWT_EXP_SECONDS        = os.getenv("JWT_EXP_SECONDS")         or (60*60) -- an hour
 
     ngx.log(ngx.INFO, "about executing afip.mod_auth.authenticate...")
 
@@ -296,17 +332,20 @@ function mod_auth.authenticate()
         return
     end
 
-    local sso
-    sso, status, err = mod_auth.validate_token_sign(token, sign, opts)
-    if not sso or err then
+    local payload
+    payload, status, err = validate_token_sign(token, sign, opts)
+    if not payload or err then
         ngx.status = status or INTERNAL_SERVER_ERROR
-        ngx.say(err or "not sso !!!")
+        ngx.say(err or "not payload !!!")
         ngx.exit(ngx.status)
         return
     end
 
-    ngx.say("sso [" , JSON:encode(sso), "]")
-    ngx.say("sign [" , sign , "]")
+    local jwt_token, jwt_object
+    jwt_token, jwt_object, err = make_jwt(payload, opts)
+
+    ngx.say("jwt_object [" , JSON:encode(jwt_object), "]")
+    ngx.say("jwt_token [" , jwt_token , "]")
     ngx.say("OK")
 end
 

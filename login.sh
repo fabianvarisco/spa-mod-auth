@@ -3,27 +3,19 @@
 readonly AUTH_SERVER_CN="www.example.com"
 readonly SERVICE_CN="fe-webapp-bff"
 readonly SSO_TEST_XML="./test/sso.test.xml"
-readonly MY_PRIVATE_KEY_PEM="./test/myprivatekey.pem"
-readonly MY_PUBLIC_KEY_PEM="./crypto-config/mypublickey.pem"
+readonly JWT_SECRET_TXT="./test/jwtsecret.txt"
 readonly AUTH_SERVER_PRIVATE_KEY_PEM="./test/${AUTH_SERVER_CN}.privatekey.pem"
 readonly AUTH_SERVER_PUBLIC_KEY_PEM="./crypto-config/${AUTH_SERVER_CN}.publickey.pem"
 
 rm -f ./crypto-config/*
 rm -f ./tmp/*
 
-if [[ ! -f $MY_PRIVATE_KEY_PEM ]]; then
-   echo "ERROR: file [$MY_PRIVATE_KEY_PEM] not found !!!"
+if [[ ! -f $JWT_SECRET_TXT ]]; then
+   echo "ERROR: file [$JWT_SECRET_TXT] not found !!!"
    exit 1
 fi
 
-openssl rsa -in "$MY_PRIVATE_KEY_PEM" -pubout -out "$MY_PUBLIC_KEY_PEM"
-
-if [[ ! -f $MY_PUBLIC_KEY_PEM ]]; then
-   echo "ERROR: file [$MY_PUBLIC_KEY_PEM] not found !!!"
-   exit 1
-fi
-
-cp "$MY_PRIVATE_KEY_PEM" ./crypto-config/
+cp "$JWT_SECRET_TXT" ./crypto-config/
 
 if [[ ! -f $AUTH_SERVER_PRIVATE_KEY_PEM ]]; then
    echo "ERROR: file [$AUTH_SERVER_PRIVATE_KEY_PEM] not found !!!"
