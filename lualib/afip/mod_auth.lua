@@ -212,7 +212,7 @@ local function validate_token_sign(token, sign, opts)
         return nil, INTERNAL_SERVER_ERROR, err
     end
     if not ok then
-        return nil, BAD_REQUEST, "token signature mismatched: wrong-signature"
+        return nil, ngx.HTTP_UNAUTHORIZED, "token signature mismatched: wrong-signature"
     end
 
     if not sso.id._attr.dst then
@@ -227,7 +227,7 @@ local function validate_token_sign(token, sign, opts)
 
     err = check_exp_time(sso_payload.sso_exp_time, opts)
     if err then
-        return nil, BAD_REQUEST, err
+        return nil, ngx.HTTP_UNAUTHORIZED, err
     end
 
     if not sso.operation then
@@ -330,11 +330,11 @@ function mod_auth.authenticate()
 
     ngx.log(ngx.INFO, "about executing afip.mod_auth.authenticate...")
 
-    ngx.log(ngx.INFO, "with options [" .. JSON:encode(opts) .. "]")
+    ngx.log(ngx.INFO, "with options [" .. JSON:encode_pretty(opts) .. "]")
 
     local token, sign, status, err = get_afip_token_sing(opts)
     if not token or not sign or err then
-        ngx.status = status or INTERNAL_SERVER_ERROR
+        ngx.status = status or ngx.HTTP_INTERNAL_SERVER_ERROR
         ngx.say(err or "not token or not sign !!!" )
         ngx.exit(ngx.status)
         return
@@ -343,7 +343,7 @@ function mod_auth.authenticate()
     local payload
     payload, status, err = validate_token_sign(token, sign, opts)
     if not payload or err then
-        ngx.status = status or INTERNAL_SERVER_ERROR
+        ngx.status = status or ngx.HTTP_INTERNAL_SERVER_ERROR
         ngx.say(err or "not payload !!!")
         ngx.exit(ngx.status)
         return
@@ -351,6 +351,13 @@ function mod_auth.authenticate()
 
     local jwt_token, jwt_object
     jwt_token, jwt_object, err = make_jwt(payload, opts)
+
+    if not jwt_token or not jwt_object or err then
+        ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
+        ngx.say(err or "not jwt !!!")
+        ngx.exit(ngx.status)
+        return
+    end
 
     ngx.say("jwt_object [" , JSON:encode(jwt_object), "]")
     ngx.say("jwt_token [" , jwt_token , "]")
