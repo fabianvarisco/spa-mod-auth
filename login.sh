@@ -1,33 +1,43 @@
 #!/bin/bash
 
 readonly AUTH_SERVER_CN="www.example.com"
-
 readonly SERVICE_CN="fe-webapp-bff"
-
 readonly SSO_TEST_XML="./test/sso.test.xml"
+readonly MY_PRIVATE_KEY_PEM="./test/myprivatekey.pem"
+readonly MY_PUBLIC_KEY_PEM="./crypto-config/mypublickey.pem"
+readonly AUTH_SERVER_PRIVATE_KEY_PEM="./test/${AUTH_SERVER_CN}.privatekey.pem"
+readonly AUTH_SERVER_PUBLIC_KEY_PEM="./crypto-config/${AUTH_SERVER_CN}.publickey.pem"
 
-readonly EXAMPLE_PRIVATE_KEY_PEM="./test/${AUTH_SERVER_CN}.privatekey.pem"
+rm -f ./crypto-config/*
+rm -f ./tmp/*
 
-readonly EXAMPLE_PUBLIC_KEY_PEM="./crypto-config/${AUTH_SERVER_CN}.publickey.pem"
-
-if [[ ! -f $EXAMPLE_PRIVATE_KEY_PEM ]]; then
-   echo "ERROR: file [$EXAMPLE_PRIVATE_KEY_PEM] not found !!!"
+if [[ ! -f $MY_PRIVATE_KEY_PEM ]]; then
+   echo "ERROR: file [$MY_PRIVATE_KEY_PEM] not found !!!"
    exit 1
 fi
 
-if [[ ! -f $EXAMPLE_PUBLIC_KEY_PEM ]]; then
-    openssl rsa -in "$EXAMPLE_PRIVATE_KEY_PEM" -pubout -out "$EXAMPLE_PUBLIC_KEY_PEM"
-fi
+openssl rsa -in "$MY_PRIVATE_KEY_PEM" -pubout -out "$MY_PUBLIC_KEY_PEM"
 
-if [[ ! -f $EXAMPLE_PUBLIC_KEY_PEM ]]; then
-   echo "ERROR: file [$EXAMPLE_PUBLIC_KEY_PEM] not found !!!"
+if [[ ! -f $MY_PUBLIC_KEY_PEM ]]; then
+   echo "ERROR: file [$MY_PUBLIC_KEY_PEM] not found !!!"
    exit 1
 fi
 
-rm -f ./tmp/sso.xml
-rm -f ./tmp/sso.xml.base64
-rm -f ./tmp/sign
-rm -f ./tmp/sign.base64
+cp "$MY_PRIVATE_KEY_PEM" ./crypto-config/
+
+if [[ ! -f $AUTH_SERVER_PRIVATE_KEY_PEM ]]; then
+   echo "ERROR: file [$AUTH_SERVER_PRIVATE_KEY_PEM] not found !!!"
+   exit 1
+fi
+
+openssl rsa -in "$AUTH_SERVER_PRIVATE_KEY_PEM" -pubout -out "$AUTH_SERVER_PUBLIC_KEY_PEM"
+
+if [[ ! -f $AUTH_SERVER_PUBLIC_KEY_PEM ]]; then
+   echo "ERROR: file [$AUTH_SERVER_PUBLIC_KEY_PEM] not found !!!"
+   exit 1
+fi
+
+cp "$MY_PRIVATE_KEY_PEM" ./crypto-config/
 
 gen_time=$(date +%s)
 readonly gen_time
@@ -41,7 +51,7 @@ sed "s/{{AUTH_SERVER_CN}}/${AUTH_SERVER_CN}/" | \
 sed "s/{{SERVICE_CN}}/${SERVICE_CN}/g" \
 > ./tmp/sso.xml
 
-openssl dgst -sha256 -sign "$EXAMPLE_PRIVATE_KEY_PEM" -out ./tmp/sign ./tmp/sso.xml
+openssl dgst -sha256 -sign "$AUTH_SERVER_PRIVATE_KEY_PEM" -out ./tmp/sign ./tmp/sso.xml
 
 for file in sso.xml sign; do
     base64 -w 0 "./tmp/$file" | sed 's/+/-/g' | tr -d '=' > "./tmp/$file.base64"

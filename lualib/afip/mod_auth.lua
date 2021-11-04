@@ -199,7 +199,7 @@ function mod_auth.validate_token_sign(token, sign, opts)
         return nil, INTERNAL_SERVER_ERROR, err
     end
     if not ok then
-        return nil, BAD_REQUEST, "unverified sign"
+        return nil, BAD_REQUEST, "token signature mismatched: wrong-signature"
     end
 
     if not sso.id._attr.dst then
@@ -279,10 +279,10 @@ end
 
 function mod_auth.authenticate()
     local opts = {}
-    opts.INITIAL_SLACK_SECONDS   = os.getenv("INITIAL_SLACK_SECONDS")   or 120
-    opts.CRYPTO_CONFIG_DIR       = os.getenv("CRYPTO_CONFIG_DIR")       or "/secrets"
-    opts.MY_PRIVATE_KEY_PEM_PATH = os.getenv("MY_PRIVATE_KEY_PEM_PATH") or "/secrets/myprivate.key"
-    opts.MY_PUBLIC_KEY_PEM_PATH  = os.getenv("MY_PUBLIC_KEY_PEM_PATH")  or "/secrets/mypublic.key"
+    opts.INITIAL_SLACK_SECONDS = os.getenv("INITIAL_SLACK_SECONDS")   or 120
+    opts.CRYPTO_CONFIG_DIR     = os.getenv("CRYPTO_CONFIG_DIR")       or "/secrets"
+    opts.MY_PRIVATE_KEY_PEM    = os.getenv("MY_PRIVATE_KEY_PEM") or "/secrets/myprivate.key"
+    opts.MY_PUBLIC_KEY_PEM     = os.getenv("MY_PUBLIC_KEY_PEM")  or "/secrets/mypublic.key"
 
     ngx.log(ngx.INFO, "about executing afip.mod_auth.authenticate...")
 
