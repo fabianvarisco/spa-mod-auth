@@ -101,6 +101,7 @@ local function get_afip_token_sing(opts)
     ngx.req.read_body()
     local args, err = ngx.req.get_post_args()
     if err then
+        ngx.log(ngx.ERR, debug.traceback(err))
         return nil, nil, INTERNAL_SERVER_ERROR, err
     end
     if not args then
@@ -121,20 +122,28 @@ local function get_afip_token_sing(opts)
 end
 
 function mod_auth.validate_token_sign(token, sign, opts)
+    local err
     if not token or type(token) ~= "string" then
-        return nil, INTERNAL_SERVER_ERROR, "param #1: token nil or not string"
+        err = "param #1: token nil or not string"
+        ngx.log(ngx.ERR, debug.traceback(err))
+        return nil, INTERNAL_SERVER_ERROR, err
     end
     if not sign or type(sign) ~= "string" then
-        return nil, INTERNAL_SERVER_ERROR, "param #2: sign nil or not string"
+        err = "param #2: sign nil or not string"
+        ngx.log(ngx.ERR, debug.traceback(err))
+        return nil, INTERNAL_SERVER_ERROR, err
     end
 
-    local sso_xml, err = decode(token)
+    local sso_xml
+    sso_xml, err = decode(token)
     if err then
         return nil, BAD_REQUEST, "invalid token: " .. err
     end
 
     if not sso_xml or type(sso_xml) ~= "string" then
-        return nil, INTERNAL_SERVER_ERROR, "sso_xml nil or not string"
+        err = "sso_xml nil or not string"
+        ngx.log(ngx.ERR, debug.traceback(err))
+        return nil, INTERNAL_SERVER_ERROR, err
     end
 
     if not sso_xml:find("^<") then
@@ -172,7 +181,9 @@ function mod_auth.validate_token_sign(token, sign, opts)
         return nil, BAD_REQUEST, err
     end
     if not authserver_publickey then
-        return nil, INTERNAL_SERVER_ERROR, "not err and not publickey !!!"
+        err = "not err and not publickey !!!"
+        ngx.log(ngx.ERR, debug.traceback(err))
+        return nil, INTERNAL_SERVER_ERROR, err
     end
 
     local sign2
@@ -181,14 +192,11 @@ function mod_auth.validate_token_sign(token, sign, opts)
         return nil, BAD_REQUEST, "invalid sign: " .. err
     end
 
-    -- ngx.log(ngx.INFO, "type(sign2) [" .. type(sign2) .. "]")
-    -- ngx.log(ngx.INFO, "type(sso_xml) [" .. type(sso_xml) .. "]")
-    -- ngx.log(ngx.INFO, "sso_xml [" .. sso_xml .. "]")
-
     local ok
-    ok, err = authserver_publickey.verify(sign2, sso_xml)
+    ok, err = authserver_publickey:verify(sign2, sso_xml)
     if err then
-        return nil, INTERNAL_SERVER_ERROR, "verify error: " .. err  .. " - type(sso_xml) [" .. type(sso_xml) .. "]"
+        ngx.log(ngx.ERR, debug.traceback(err))
+        return nil, INTERNAL_SERVER_ERROR, err
     end
     if not ok then
         return nil, BAD_REQUEST, "unverified sign"
