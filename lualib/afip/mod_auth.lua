@@ -1,7 +1,17 @@
-local ngx  = ngx
-local JSON = require("afip.JSON")
-local PKEY = require("resty.openssl.pkey")
-local JWT  = require("resty.jwt")
+--[[
+TODO:
+1. use ngx.HTTP_STATUS and UNAUTHORIZED
+2. send token in cookies
+3. redirect to /acl
+4. add location /acl with jwt validation
+]]
+
+local ngx         = ngx
+local JSON        = require("afip.JSON")
+local PKEY        = require("resty.openssl.pkey")
+local JWT         = require("resty.jwt")
+local XML         = require("xml2lua")
+local XML_HANDLER = require("xmlhandler.tree")
 
 local JWT_SECRET_TXT = nil
 
@@ -155,11 +165,9 @@ local function validate_token_sign(token, sign, opts)
         return nil, BAD_REQUEST, "invalid xml token: does not start with <"
     end
 
-    local xml2lua = require("xml2lua")
     -- https://github.com/manoelcampos/xml2lua/issues/29
-    local handler = require("xmlhandler.tree"):new()
-    local parser = xml2lua.parser(handler)
-    parser:parse(sso_xml)
+    local handler = XML_HANDLER:new()
+    XML.parser(handler):parse(sso_xml)
 
     local sso = handler.root.sso
     if not sso then
