@@ -9,6 +9,7 @@ dev: clean
 		-v `pwd`/nginx/conf:/usr/local/openresty/nginx/conf/ \
 		-v `pwd`/lualib/afip:/usr/local/openresty/lualib/afip/ \
 		-v `pwd`/crypto-config:/crypto-config/ \
+		-v `pwd`/test:/test/ \
 		app:3
 
 clean:
