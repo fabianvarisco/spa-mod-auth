@@ -1,7 +1,11 @@
 local ngx = ngx
 local JSON = require("afip.JSON")
+local PKEY = require("resty.openssl.pkey")
+local INTERNAL_SERVER_ERROR = 500
+local BAD_REQUEST = 500
 
 local mod_auth = {}
+
 local auth_servers_cache = {}
 
 local function decode(value)
@@ -65,57 +69,76 @@ local function get_cn_from_dn(dn)
     return nil
 end
 
-local function get_authserver_publickey_pem(dn, opts)
+local function get_authserver_publickey(dn, opts)
     local service_name = get_cn_from_dn(dn)
     if not service_name then
         return nil, "dn [" .. dn .. "] without cn"
     end
 
-    local publickey_pem = auth_servers_cache[service_name]
-    if publickey_pem then
-        ngx.log(ngx.INFO, "got [" .. service_name .. "] publickey_pem from cache")
-        return publickey_pem
+    local pkey = auth_servers_cache[service_name]
+    if pkey then
+        -- gx.log(ngx.INFO, "got [" .. service_name .. "] publickey_pem from cache")
+        return pkey
     end
 
     local content, err = readAll(opts.CRYPTO_CONFIG_DIR .. service_name .. ".publickey.pem")
     if err then
         return nil, service_name .. ".publickey.pem not found"
     end
-    auth_servers_cache[service_name] = content
-    ngx.log(ngx.INFO, "put [" .. service_name .. "] publickey_pem into cache [" .. content .. "]")
-    return content
+
+    -- https://github.com/fffonion/lua-resty-openssl#pkeynew
+    pkey, err = PKEY.new(content, {format = "PEM", type = "pu"})
+    if err then
+        return nil, "invalid " .. service_name .. ".publickey.pem: [" .. err .. "]"
+    end
+
+    auth_servers_cache[service_name] = pkey
+    -- ngx.log(ngx.INFO, "put [" .. service_name .. "] publickey_pem into cache [" .. content .. "]")
+    return pkey
 end
 
 local function get_afip_token_sing(opts)
     ngx.req.read_body()
     local args, err = ngx.req.get_post_args()
-
     if err then
-        return nil, nil, ngx.HTTP_INTERNAL_SERVER_ERROR, err
+        return nil, nil, INTERNAL_SERVER_ERROR, err
     end
-
     if not args then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "no post args"
+        return nil, nil, BAD_REQUEST, "no post args"
     end
 
     local token = args["token"]
-    local sign = args["sign"]
-
     if not token then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "empty token"
+        return nil, nil, BAD_REQUEST, "empty token"
     end
 
+    local sign = args["sign"]
     if not sign then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "empty sign"
+        return nil, nil, BAD_REQUEST, "empty sign"
     end
 
-    local sso_xml
-    sso_xml, err = decode(token)
-    if err then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "invalid token: " .. err
+    return token, sign, nil, nil
+end
+
+function mod_auth.validate_token_sign(token, sign, opts)
+    if not token or type(token) ~= "string" then
+        return nil, INTERNAL_SERVER_ERROR, "param #1: token nil or not string"
     end
+    if not sign or type(sign) ~= "string" then
+        return nil, INTERNAL_SERVER_ERROR, "param #2: sign nil or not string"
+    end
+
+    local sso_xml, err = decode(token)
+    if err then
+        return nil, BAD_REQUEST, "invalid token: " .. err
+    end
+
+    if not sso_xml or type(sso_xml) ~= "string" then
+        return nil, INTERNAL_SERVER_ERROR, "sso_xml nil or not string"
+    end
+
     if not sso_xml:find("^<") then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "invalid xml token: does not start with <"
+        return nil, BAD_REQUEST, "invalid xml token: does not start with <"
     end
 
     local xml2lua = require("xml2lua")
@@ -126,62 +149,81 @@ local function get_afip_token_sing(opts)
 
     local sso = handler.root.sso
     if not sso then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "invalid sso.xml"
+        return nil, BAD_REQUEST, "invalid sso.xml"
     end
 
     if not sso.id then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "invalid sso.id"
+        return nil, BAD_REQUEST, "invalid sso.id"
     end
 
     if not sso.id._attr then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "empty sso.id"
+        return nil, BAD_REQUEST, "empty sso.id"
     end
 
     local sso_payload = {}
     if not sso.id._attr.src then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "empty sso.id.src"
+        return nil, BAD_REQUEST, "empty sso.id.src"
     end
     sso_payload.src = sso.id._attr.src
 
-    local authserver_publickey_pem
-    authserver_publickey_pem, err = get_authserver_publickey_pem(sso_payload.src, opts)
+    local authserver_publickey
+    authserver_publickey, err = get_authserver_publickey(sso_payload.src, opts)
     if err then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, err
+        return nil, BAD_REQUEST, err
     end
-    if not authserver_publickey_pem then
-        return nil, nil, ngx.HTTP_INTERNAL_SERVER_ERROR, "not err and not authserver_publickey_pem !!!"
+    if not authserver_publickey then
+        return nil, INTERNAL_SERVER_ERROR, "not err and not publickey !!!"
+    end
+
+    local sign2
+    sign2, err = decode(sign)
+    if err then
+        return nil, BAD_REQUEST, "invalid sign: " .. err
+    end
+
+    -- ngx.log(ngx.INFO, "type(sign2) [" .. type(sign2) .. "]")
+    -- ngx.log(ngx.INFO, "type(sso_xml) [" .. type(sso_xml) .. "]")
+    -- ngx.log(ngx.INFO, "sso_xml [" .. sso_xml .. "]")
+
+    local ok
+    ok, err = authserver_publickey.verify(sign2, sso_xml)
+    if err then
+        return nil, INTERNAL_SERVER_ERROR, "verify error: " .. err  .. " - type(sso_xml) [" .. type(sso_xml) .. "]"
+    end
+    if not ok then
+        return nil, BAD_REQUEST, "unverified sign"
     end
 
     if not sso.id._attr.dst then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "empty sso.id.dst"
+        return nil, BAD_REQUEST, "empty sso.id.dst"
     end
     sso_payload.dst = sso.id._attr.dst
 
     if not sso.id._attr.exp_time then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "empty sso.id.exp_time"
+        return nil, BAD_REQUEST, "empty sso.id.exp_time"
     end
     sso_payload.exp_time = sso.id._attr.exp_time
 
     err = check_exp_time(sso_payload.exp_time, opts)
     if err then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, err
+        return nil, BAD_REQUEST, err
     end
 
     if not sso.operation then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "invalid sso.operation"
+        return nil, BAD_REQUEST, "invalid sso.operation"
     end
 
     if not sso.operation.login then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "invalid sso.operation.login"
+        return nil, BAD_REQUEST, "invalid sso.operation.login"
     end
     local login = sso.operation.login
 
     if not login._attr then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "sso.operation.login without attributes"
+        return nil, BAD_REQUEST, "sso.operation.login without attributes"
     end
 
     if not login._attr.service then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "invalid sso.operation.login.service"
+        return nil, BAD_REQUEST, "invalid sso.operation.login.service"
     end
     sso_payload.service = login._attr.service
     sso_payload.uid     = login._attr.uid -- mandatory?
@@ -205,7 +247,7 @@ local function get_afip_token_sing(opts)
     end
 
     if #sso_payload.relations == 0 and #sso_payload.groups == 0 then
-        return nil, nil, ngx.HTTP_BAD_REQUEST, "sso.operation.login without relations and groups"
+        return nil, BAD_REQUEST, "sso.operation.login without relations and groups"
     end
 
     if login.info then
@@ -224,7 +266,7 @@ local function get_afip_token_sing(opts)
         end
     end
 
-    return sso_payload, sign, nil, nil
+    return sso_payload, nil, nil
 end
 
 function mod_auth.authenticate()
@@ -238,10 +280,19 @@ function mod_auth.authenticate()
 
     ngx.log(ngx.INFO, "with options [" .. JSON:encode(opts) .. "]")
 
-    local sso, sign, status, err = get_afip_token_sing(opts)
-    if err then
-        ngx.status = status
-        ngx.say(err)
+    local token, sign, status, err = get_afip_token_sing(opts)
+    if not token or not sign or err then
+        ngx.status = status or INTERNAL_SERVER_ERROR
+        ngx.say(err or "not token or not sign !!!" )
+        ngx.exit(ngx.status)
+        return
+    end
+
+    local sso
+    sso, status, err = mod_auth.validate_token_sign(token, sign, opts)
+    if not sso or err then
+        ngx.status = status or INTERNAL_SERVER_ERROR
+        ngx.say(err or "not sso !!!")
         ngx.exit(ngx.status)
         return
     end

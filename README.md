@@ -11,3 +11,10 @@ http://regex.info/blog/lua/json
 https://github.com/manoelcampos/xml2lua
 
 https://openresty.org/download/agentzh-nginx-tutorials-en.html
+
+
+---
+
+sudo apt install lua5.3
+
+sudo apt-get install -y luarocks
