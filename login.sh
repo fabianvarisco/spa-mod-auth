@@ -29,8 +29,6 @@ if [[ ! -f $AUTH_SERVER_PUBLIC_KEY_PEM ]]; then
    exit 1
 fi
 
-cp "$MY_PRIVATE_KEY_PEM" ./crypto-config/
-
 gen_time=$(date +%s)
 readonly gen_time
 
@@ -52,5 +50,6 @@ done
 data="foo=foo&bar=bar&token=$(cat ./tmp/sso.xml.base64)&sign=$(cat ./tmp/sign.base64)"
 readonly data
 
-set -x
 curl -i --data "${data}" localhost:8000/login
+
+# curl -i --data "${data}" localhost:8000/testlogin
