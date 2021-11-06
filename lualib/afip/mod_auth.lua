@@ -326,11 +326,28 @@ local function make_jwt(payload)
         return nil, nil, err or "not JWT_SECRET_CONTENT"
     end
 
-    ngx.log(ngx.INFO, JSON:encode_pretty(assertion))
+    ngx.log(ngx.DEBUG, JSON:encode_pretty(assertion))
 
     local jwt_token = JWT:sign(JWT_SECRET_CONTENT, assertion)
 
     return jwt_token, assertion, nil
+end
+
+local function verify_jwt(jwt_token)
+    local err = load_JWT_SECRET_CONTENT()
+    if not JWT_SECRET_CONTENT or err then
+        return nil, err or "not JWT_SECRET_CONTENT"
+    end
+
+    -- https://github.com/cdbattags/lua-resty-jwt#verify
+    local jwt_object = JWT:verify(JWT_SECRET_CONTENT, jwt_token)
+    if not jwt_object or not jwt_object.verified or not jwt_object.valid then
+        if jwt_object and jwt_object.reason then
+            err = jwt_object.reason
+        end
+        return nil, err or "verify error but not reason"
+    end
+    return jwt_object, nil
 end
 
 local function set_cookie(jwt_token)
@@ -348,18 +365,19 @@ local function set_cookie(jwt_token)
         value = jwt_token,
         path = OPTS.JWT_COOKIE_PATH,
         domain = OPTS.JWT_COOKIE_DOMAIN,
-        secure = true,
-        httponly = true,
+        secure = false,   -- TODO: set true
+        httponly = false, -- TODO: set true
         samesite = "Strict"
     })
-
     if not ok or err then
         return err or "not cookie set ok"
     end
+
+    return nil
 end
 
 function mod_auth.authenticate()
-    ngx.log(ngx.INFO, "about executing afip.mod_auth.authenticate...")
+    ngx.log(ngx.INFO, "about executing afip.mod_auth.authenticate ...")
 
     local token, sign, status, err = get_afip_token_sing()
     if not token or not sign or err then
@@ -396,9 +414,50 @@ function mod_auth.authenticate()
         return
     end
 
+    ngx.status = ngx.HTTP_OK
     ngx.say("jwt_object [" , JSON:encode(jwt_object), "]")
     ngx.say("jwt_token [" , jwt_token , "]")
     ngx.say("OK")
+end
+
+local function get_jwt_from_cookie()
+    -- https://github.com/cloudflare/lua-resty-cookie
+    local cookie, err = COOKIE:new()
+    if not cookie or err then
+        return err or "not new cookie obejct"
+    end
+
+    local jwt_token
+    jwt_token, err = cookie:get(OPTS.JWT_COOKIE_NAME)
+    if not jwt_token or err then
+        return err or "not cookie get ok"
+    end
+    return jwt_token, nil
+end
+
+function mod_auth:secure()
+    ngx.log(ngx.INFO, "about executing afip.mod_auth.secure ...")
+
+    local jwt_token, err = get_jwt_from_cookie()
+    if not jwt_token or err then
+        ngx.status = ngx.HTTP_UNAUTHORIZED
+        ngx.say(JSON:encode({status = ngx.status, error = err or "not jwt_token"}))
+        ngx.exit(ngx.status)
+        return
+    end
+
+    local jwt_object
+    jwt_object, err = verify_jwt(jwt_token)
+    if not jwt_object or err then
+        ngx.status = ngx.HTTP_UNAUTHORIZED
+        ngx.say(JSON:encode({status = ngx.status, error = err or "not jwt_object"}))
+        ngx.exit(ngx.status)
+        return
+    end
+
+    ngx.status = ngx.HTTP_OK
+    ngx.say(JSON:encode(jwt_object))
+    ngx.exit(ngx.status)
 end
 
 return mod_auth
