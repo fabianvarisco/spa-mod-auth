@@ -6,14 +6,15 @@ TODO:
 4. add location /acl with jwt validation
 ]]
 
-local ngx         = ngx
-local JSON        = require("afip.JSON")
-local COOKIE      = require("resty.cookie")
-local JWT         = require("resty.jwt")
-local PKEY        = require("resty.openssl.pkey")
-local JIT_UUID    = require("resty.jit-uuid")
-local XML         = require("xml2lua")
-local XML_HANDLER = require("xmlhandler.tree")
+local ngx            = ngx
+local JSON           = require("cjson")
+local COOKIE         = require("resty.cookie")
+local JWT            = require("resty.jwt")
+local JWT_VALIDATORS = require("resty.jwt-validators")
+local PKEY           = require("resty.openssl.pkey")
+local JIT_UUID       = require("resty.jit-uuid")
+local XML            = require("xml2lua")
+local XML_HANDLER    = require("xmlhandler.tree")
 
 JIT_UUID.seed() -- very important!
 
@@ -27,7 +28,15 @@ OPTS.JWT_COOKIE_PATH        = os.getenv("JWT_COOKIE_PATH")         or "/"
 OPTS.JWT_COOKIE_DOMAIN      = os.getenv("JWT_COOKIE_DOMAIN")       or ngx.var.http_host
 OPTS.JWT_TIMEIN_SECONDS     = os.getenv("JWT_TIMEIN_SECONDS")      or (60*5) -- five minutes
 
-ngx.log(ngx.INFO, "with options [" .. JSON:encode_pretty(OPTS) .. "]")
+ngx.log(ngx.INFO, "with options [" .. JSON.encode(OPTS) .. "]")
+
+local JWT_CLAIM_SPEC = {
+    jti = JWT_VALIDATORS.required(),
+    iat = JWT_VALIDATORS.required(),
+    exp = JWT_VALIDATORS.is_not_expired(),
+    dst = JWT_VALIDATORS.required(),
+    src = JWT_VALIDATORS.required(),
+}
 
 local JWT_SECRET_CONTENT = nil
 
@@ -338,7 +347,7 @@ local function make_jwt(payload)
         return nil, nil, err or "not JWT_SECRET_CONTENT"
     end
 
-    ngx.log(ngx.DEBUG, JSON:encode(assertion))
+    ngx.log(ngx.DEBUG, JSON.encode(assertion))
 
     local jwt_token = JWT:sign(JWT_SECRET_CONTENT, assertion)
 
@@ -352,13 +361,14 @@ local function verify_jwt(jwt_token)
     end
 
     -- https://github.com/cdbattags/lua-resty-jwt#verify
-    local jwt_object = JWT:verify(JWT_SECRET_CONTENT, jwt_token)
+    local jwt_object = JWT:verify(JWT_SECRET_CONTENT, jwt_token, JWT_CLAIM_SPEC)
     if not jwt_object or not jwt_object.verified or not jwt_object.valid then
         if jwt_object and jwt_object.reason then
             err = jwt_object.reason
         end
         return nil, err or "verify error but not reason"
     end
+
     return jwt_object, nil
 end
 
@@ -405,7 +415,7 @@ end
 local function exit_error_json(status, err)
     set_cookie(nil)
     ngx.status = status or ngx.HTTP_INTERNAL_SERVER_ERROR
-    ngx.say(JSON:encode({status = ngx.status, error = err or "nil"}))
+    ngx.say(JSON.encode({status = ngx.status, error = err or "nil"}))
     ngx.exit(ngx.status)
 end
 
@@ -433,7 +443,7 @@ function mod_auth.authenticate()
     end
 
     ngx.status = ngx.HTTP_OK
-    ngx.say("jwt_object [" , JSON:encode(jwt_object), "]")
+    ngx.say("jwt_object [" , JSON.encode(jwt_object), "]")
     ngx.say("jwt_token [" , jwt_token , "]")
     ngx.say("OK")
 end
@@ -495,7 +505,7 @@ function mod_auth:secure()
     end
 
     ngx.status = ngx.HTTP_OK
-    ngx.say(JSON:encode(jwt_object))
+    ngx.say(JSON.encode(jwt_object))
     ngx.exit(ngx.status)
 end
 
