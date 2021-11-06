@@ -25,6 +25,7 @@ OPTS.JWT_EXP_SECONDS        = os.getenv("JWT_EXP_SECONDS")         or (60*60) --
 OPTS.JWT_COOKIE_NAME        = os.getenv("JWT_COOKIE_NAME")         or "afip_jwt_token"
 OPTS.JWT_COOKIE_PATH        = os.getenv("JWT_COOKIE_PATH")         or "/"
 OPTS.JWT_COOKIE_DOMAIN      = os.getenv("JWT_COOKIE_DOMAIN")       or ngx.var.http_host
+OPTS.JWT_TIMEIN_SECONDS     = os.getenv("JWT_TIMEIN_SECONDS")      or (60*5) -- five minutes
 
 ngx.log(ngx.INFO, "with options [" .. JSON:encode_pretty(OPTS) .. "]")
 
@@ -323,7 +324,6 @@ local function load_JWT_SECRET_CONTENT()
 end
 
 local function make_jwt(payload)
-    local now = ngx.time()
     payload.iat = ngx.time()
     payload.exp = payload.iat + OPTS.JWT_EXP_SECONDS
     payload.jti = JIT_UUID()
@@ -338,7 +338,7 @@ local function make_jwt(payload)
         return nil, nil, err or "not JWT_SECRET_CONTENT"
     end
 
-    ngx.log(ngx.DEBUG, JSON:encode_pretty(assertion))
+    ngx.log(ngx.DEBUG, JSON:encode(assertion))
 
     local jwt_token = JWT:sign(JWT_SECRET_CONTENT, assertion)
 
@@ -453,6 +453,23 @@ local function get_jwt_from_cookie()
     return jwt_token, nil
 end
 
+local function is_time_to_renew(payload)
+    local jti =  payload.jti or "nil"
+
+    if jti == "nil" or not payload.iat or type(payload.iat) ~= "number" then
+        ngx.log(ngx.WARN, "jti [" .. payload.jti .. "] nil or without iat: will not be renewed :(")
+        return false -- mmm!!!
+    end
+
+    if payload.iat + OPTS.JWT_TIMEIN_SECONDS < ngx.time() then
+       ngx.log(ngx.DEBUG, "jti [" .. jti .. "] is time to renew")
+       return true
+    end
+
+    ngx.log(ngx.DEBUG, "jti [" .. jti .. "] will not be renewed yet")
+    return false
+end
+
 function mod_auth:secure()
     ngx.log(ngx.INFO, "about executing afip.mod_auth.secure ...")
 
@@ -469,15 +486,16 @@ function mod_auth:secure()
         return
     end
 
-    local new_jwt_token, new_jwt_object
-    new_jwt_token, new_jwt_object, err = set_jwt_cookie(jwt_object.payload)
-    if not new_jwt_token or not new_jwt_object or err then
-        exit_error_json(ngx.HTTP_INTERNAL_SERVER_ERROR, err or "not new jwt!!!")
-        return
+    if is_time_to_renew(jwt_object.payload) then
+        jwt_object, jwt_object, err = set_jwt_cookie(jwt_object.payload)
+        if not jwt_object or err then
+            exit_error_json(ngx.HTTP_INTERNAL_SERVER_ERROR, err or "not renewed jwt!!!")
+            return
+        end
     end
 
     ngx.status = ngx.HTTP_OK
-    ngx.say(JSON:encode(new_jwt_object))
+    ngx.say(JSON:encode(jwt_object))
     ngx.exit(ngx.status)
 end
 
