@@ -227,6 +227,11 @@ local function validate_token_sign(token, sign)
         return nil, ngx.HTTP_UNAUTHORIZED, "token signature mismatched: wrong-signature"
     end
 
+    if not sso.id._attr.unique_id then
+        return nil, BAD_REQUEST, "empty sso.id.unique_id"
+    end
+    sso_payload.unique_id = sso.id._attr.unique_id
+
     if not sso.id._attr.dst then
         return nil, BAD_REQUEST, "empty sso.id.dst"
     end
@@ -299,6 +304,9 @@ local function validate_token_sign(token, sign)
         end
     end
 
+	-- TODO: xml_auth_data.servicedata_from = NULL;
+	-- TODO: xml_auth_data.servicedata_content = NULL;
+
     return sso_payload, nil, nil
 end
 
@@ -357,7 +365,7 @@ local function set_cookie(jwt_token)
         return err or "not new cookie obejct"
     end
 
-    -- ToDO: test ngx.header['Set-Cookie'] = {'a=32; path=/', 'b=4; path=/'}
+    -- TODO: test ngx.header['Set-Cookie'] = {'a=32; path=/', 'b=4; path=/'} to avoid require a module
 
     local ok
     ok, err = cookie:set({
@@ -370,7 +378,7 @@ local function set_cookie(jwt_token)
         samesite = "Strict"
     })
     if not ok or err then
-        return err or "not cookie set ok"
+        return err or "not cookie setting ok"
     end
 
     return nil
