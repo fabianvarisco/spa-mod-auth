@@ -8,11 +8,14 @@ TODO:
 
 local ngx         = ngx
 local JSON        = require("afip.JSON")
-local PKEY        = require("resty.openssl.pkey")
+local COOKIE      = require("resty.cookie")
 local JWT         = require("resty.jwt")
+local PKEY        = require("resty.openssl.pkey")
+local JIT_UUID    = require("resty.jit-uuid")
 local XML         = require("xml2lua")
 local XML_HANDLER = require("xmlhandler.tree")
-local COOKIE      = require("resty.cookie")
+
+JIT_UUID.seed() -- very important!
 
 local OPTS = {}
 OPTS.INITIAL_SLACK_SECONDS  = os.getenv("INITIAL_SLACK_SECONDS")   or 120
@@ -148,7 +151,7 @@ local function get_afip_token_sing()
     return token, sign, nil, nil
 end
 
-local function validate_token_sign(token, sign)
+local function validate_sso_xml_token(token, sign)
     local err
     if not token or type(token) ~= "string" then
         err = "param #1: token nil or not string"
@@ -323,6 +326,7 @@ local function make_jwt(payload)
     local now = ngx.time()
     payload.iat = ngx.time()
     payload.exp = payload.iat + OPTS.JWT_EXP_SECONDS
+    payload.jti = JIT_UUID()
 
     local assertion = {
       header = { typ = "JWT", alg = "HS512" },
@@ -396,7 +400,7 @@ function mod_auth.authenticate()
     end
 
     local payload
-    payload, status, err = validate_token_sign(token, sign)
+    payload, status, err = validate_sso_xml_token(token, sign)
     if not payload or err then
         ngx.status = status or ngx.HTTP_INTERNAL_SERVER_ERROR
         ngx.say(err or "not payload !!!")
