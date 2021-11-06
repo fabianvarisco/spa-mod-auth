@@ -403,6 +403,7 @@ local function set_jwt_cookie(payload)
 end
 
 local function exit_error_json(status, err)
+    set_cookie(nil)
     ngx.status = status or ngx.HTTP_INTERNAL_SERVER_ERROR
     ngx.say(JSON:encode({status = ngx.status, error = err or "nil"}))
     ngx.exit(ngx.status)
