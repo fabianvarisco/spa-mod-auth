@@ -151,7 +151,7 @@ local function get_afip_token_sing()
     return token, sign, nil, nil
 end
 
-local function validate_sso_xml_token(token, sign)
+local function verify_sso_xml_token(token, sign)
     local err
     if not token or type(token) ~= "string" then
         err = "param #1: token nil or not string"
@@ -388,41 +388,46 @@ local function set_cookie(jwt_token)
     return nil
 end
 
+local function set_jwt_cookie(payload)
+    local jwt_token, jwt_object, err = make_jwt(payload)
+    if not jwt_token or not jwt_object or err then
+        return nil, nil, err or "not jwt !!!"
+    end
+
+    err = set_cookie(jwt_token)
+    if err then
+        return nil, nil, err
+    end
+
+    return jwt_token, jwt_object, nil
+end
+
+local function exit_error_json(status, err)
+    ngx.status = status or ngx.HTTP_INTERNAL_SERVER_ERROR
+    ngx.say(JSON:encode({status = ngx.status, error = err or "nil"}))
+    ngx.exit(ngx.status)
+end
+
 function mod_auth.authenticate()
     ngx.log(ngx.INFO, "about executing afip.mod_auth.authenticate ...")
 
     local token, sign, status, err = get_afip_token_sing()
     if not token or not sign or err then
-        ngx.status = status or ngx.HTTP_INTERNAL_SERVER_ERROR
-        ngx.say(err or "not token or not sign !!!" )
-        ngx.exit(ngx.status)
+        exit_error_json(status, err or "not token or not sign!!!" )
         return
     end
 
     local payload
-    payload, status, err = validate_sso_xml_token(token, sign)
+    payload, status, err = verify_sso_xml_token(token, sign)
     if not payload or err then
-        ngx.status = status or ngx.HTTP_INTERNAL_SERVER_ERROR
-        ngx.say(err or "not payload !!!")
-        ngx.exit(ngx.status)
+        exit_error_json(status, err or "not payload!!!")
         return
     end
 
     local jwt_token, jwt_object
-    jwt_token, jwt_object, err = make_jwt(payload)
-
+    jwt_token, jwt_object, err = set_jwt_cookie(payload)
     if not jwt_token or not jwt_object or err then
-        ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
-        ngx.say(err or "not jwt !!!")
-        ngx.exit(ngx.status)
-        return
-    end
-
-    err = set_cookie(jwt_token)
-    if err then
-        ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
-        ngx.say(err)
-        ngx.exit(ngx.status)
+        exit_error_json(ngx.HTTP_INTERNAL_SERVER_ERROR, err or "not jwt !!!")
         return
     end
 
@@ -452,23 +457,26 @@ function mod_auth:secure()
 
     local jwt_token, err = get_jwt_from_cookie()
     if not jwt_token or err then
-        ngx.status = ngx.HTTP_UNAUTHORIZED
-        ngx.say(JSON:encode({status = ngx.status, error = err or "not jwt_token"}))
-        ngx.exit(ngx.status)
+        exit_error_json(ngx.HTTP_UNAUTHORIZED, err or "not jwt_token")
         return
     end
 
     local jwt_object
     jwt_object, err = verify_jwt(jwt_token)
     if not jwt_object or err then
-        ngx.status = ngx.HTTP_UNAUTHORIZED
-        ngx.say(JSON:encode({status = ngx.status, error = err or "not jwt_object"}))
-        ngx.exit(ngx.status)
+        exit_error_json(ngx.HTTP_UNAUTHORIZED, err or "not jwt_object")
+        return
+    end
+
+    local new_jwt_token, new_jwt_object
+    new_jwt_token, new_jwt_object, err = set_jwt_cookie(jwt_object.payload)
+    if not new_jwt_token or not new_jwt_object or err then
+        exit_error_json(ngx.HTTP_INTERNAL_SERVER_ERROR, err or "not new jwt!!!")
         return
     end
 
     ngx.status = ngx.HTTP_OK
-    ngx.say(JSON:encode(jwt_object))
+    ngx.say(JSON:encode(new_jwt_object))
     ngx.exit(ngx.status)
 end
 
