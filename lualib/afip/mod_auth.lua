@@ -1,9 +1,7 @@
 --[[
 TODO:
-1. use ngx.HTTP_STATUS and UNAUTHORIZED
-2. send token in cookies
-3. redirect to /acl
-4. add location /acl with jwt validation
+1. avoid for ever session
+2. more json claim specs
 ]]
 
 local ngx            = ngx
@@ -30,6 +28,7 @@ OPTS.JWT_TIMEIN_SECONDS     = os.getenv("JWT_TIMEIN_SECONDS")      or (60*5) -- 
 
 ngx.log(ngx.INFO, "with options [" .. JSON.encode(OPTS) .. "]")
 
+-- TODO: more specs
 local JWT_CLAIM_SPEC = {
     jti = JWT_VALIDATORS.required(),
     iat = JWT_VALIDATORS.required(),
@@ -40,8 +39,9 @@ local JWT_CLAIM_SPEC = {
 
 local JWT_SECRET_CONTENT = nil
 
-local INTERNAL_SERVER_ERROR = 500
-local BAD_REQUEST           = 400
+local INTERNAL_SERVER_ERROR = ngx.HTTP_INTERNAL_SERVER_ERROR
+local BAD_REQUEST           = ngx.HTTP_BAD_REQUEST
+local UNAUTHORIZED          = ngx.HTTP_UNAUTHORIZED
 
 local mod_auth = {}
 
@@ -237,7 +237,7 @@ local function verify_sso_xml_token(token, sign)
         return nil, INTERNAL_SERVER_ERROR, err
     end
     if not ok then
-        return nil, ngx.HTTP_UNAUTHORIZED, "token signature mismatched: wrong-signature"
+        return nil, UNAUTHORIZED, "token signature mismatched: wrong-signature"
     end
 
     if not sso.id._attr.unique_id then
@@ -257,7 +257,7 @@ local function verify_sso_xml_token(token, sign)
 
     err = check_exp_time(sso_payload.sso_exp_time)
     if err then
-        return nil, ngx.HTTP_UNAUTHORIZED, err
+        return nil, UNAUTHORIZED, err
     end
 
     if not sso.operation then
@@ -414,7 +414,7 @@ end
 
 local function exit_error_json(status, err)
     set_cookie(nil)
-    ngx.status = status or ngx.HTTP_INTERNAL_SERVER_ERROR
+    ngx.status = status or INTERNAL_SERVER_ERROR
     ngx.say(JSON.encode({status = ngx.status, error = err or "nil"}))
     ngx.exit(ngx.status)
 end
@@ -438,7 +438,7 @@ function mod_auth.authenticate()
     local jwt_token, jwt_object
     jwt_token, jwt_object, err = set_jwt_cookie(payload)
     if not jwt_token or not jwt_object or err then
-        exit_error_json(ngx.HTTP_INTERNAL_SERVER_ERROR, err or "not jwt !!!")
+        exit_error_json(INTERNAL_SERVER_ERROR, err or "not jwt !!!")
         return
     end
 
@@ -485,21 +485,21 @@ function mod_auth:secure()
 
     local jwt_token, err = get_jwt_from_cookie()
     if not jwt_token or err then
-        exit_error_json(ngx.HTTP_UNAUTHORIZED, err or "not jwt_token")
+        exit_error_json(UNAUTHORIZED, err or "not jwt_token")
         return
     end
 
     local jwt_object
     jwt_object, err = verify_jwt(jwt_token)
     if not jwt_object or err then
-        exit_error_json(ngx.HTTP_UNAUTHORIZED, err or "not jwt_object")
+        exit_error_json(UNAUTHORIZED, err or "not jwt_object")
         return
     end
 
     if is_time_to_renew(jwt_object.payload) then
         jwt_object, jwt_object, err = set_jwt_cookie(jwt_object.payload)
         if not jwt_object or err then
-            exit_error_json(ngx.HTTP_INTERNAL_SERVER_ERROR, err or "not renewed jwt!!!")
+            exit_error_json(INTERNAL_SERVER_ERROR, err or "not renewed jwt!!!")
             return
         end
     end
