@@ -50,6 +50,6 @@ done
 data="foo=foo&bar=bar&token=$(cat ./tmp/sso.xml.base64)&sign=$(cat ./tmp/sign.base64)"
 readonly data
 
-curl -v -i --data "${data}" -L -c ./test/cookiefile localhost:8000/login
+curl -v -i --data "${data}" -L -c ./tmp/cookiefile localhost:8000/login
 
-curl -i --data '{"someId": 1231, "someValue": "eapp"}' -b ./test/cookiefile localhost:8000/secure
+curl -i --data '{"someId": 1231, "someValue": "eapp"}' -b ./tmp/cookiefile localhost:8000/secure
