@@ -13,8 +13,11 @@ logs:
 logs-bff:
 	docker exec -it bff tail -1000 -f /usr/local/openresty/nginx/error.log
 
-get:
-	curl -i localhost:8000/json
+bff-hello:
+	curl localhost:8000/hello
+
+nginx-hello:
+	curl -i localhost:8000/nginx-hello
 
 post:
 	curl -H "Content-Type: application/json" -X POST -d '{"id": 1, "username":"xyz","pass":"foobar"}' localhost:8000/json
