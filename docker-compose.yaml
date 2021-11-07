@@ -1,0 +1,23 @@
+version: "3.3"
+
+services:
+
+  nginx-proxy:
+    container_name: nginx-proxy
+    build: nginx
+    ports:
+    - 8000:8000
+    volumes:
+    - ./nginx/conf:/usr/local/openresty/nginx/conf
+    - ./nginx/lualib/afip:/usr/local/openresty/lualib/afip
+    - ./nginx/crypto-config:/crypto-config
+
+  bff:
+    container_name: bff
+    build: bff
+    ports:
+    - 8081:8081
+    volumes:
+    - ./bff/conf:/usr/local/openresty/nginx/conf
+    depends_on:
+    - nginx-proxy

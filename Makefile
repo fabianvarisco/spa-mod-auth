@@ -20,7 +20,7 @@ reload:
 	docker exec -it app /usr/local/openresty/nginx/sbin/nginx -s reload
 
 logs:
-	docker exec -it app tail -1000 -f /usr/local/openresty/nginx/error.log
+	docker exec -it nginx-proxy tail -1000 -f /usr/local/openresty/nginx/error.log
 
 get:
 	curl -i localhost:8000/json
@@ -31,5 +31,8 @@ post:
 post-invalid:
 	curl -H "Content-Type: application/json" -X POST -d '{"id": 1, "username":"xyz","pass:}' localhost:8000/json
 
-login:
-	curl --data 'foo=bar&bar=baz&bar=blah&sign=XXXX&token=${var_token}' localhost:8000/login
+up:
+	docker-compose up -d
+
+runtest:
+	./test/test.sh
