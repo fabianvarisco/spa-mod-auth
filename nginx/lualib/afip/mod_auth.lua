@@ -4,6 +4,8 @@ TODO:
 2. more json claim specs
 ]]
 
+local _M = {}
+
 local ngx            = ngx
 local JSON           = require("cjson")
 local COOKIE         = require("resty.cookie")
@@ -42,8 +44,6 @@ local JWT_SECRET_CONTENT = nil
 local INTERNAL_SERVER_ERROR = ngx.HTTP_INTERNAL_SERVER_ERROR
 local BAD_REQUEST           = ngx.HTTP_BAD_REQUEST
 local UNAUTHORIZED          = ngx.HTTP_UNAUTHORIZED
-
-local mod_auth = {}
 
 local auth_servers_cache = {}
 
@@ -419,7 +419,7 @@ local function exit_error_json(status, err)
     ngx.exit(ngx.status)
 end
 
-function mod_auth.authenticate()
+function _M.authenticate()
     ngx.log(ngx.INFO, "about executing afip.mod_auth.authenticate ...")
 
     local token, sign, status, err = get_afip_token_sing()
@@ -480,7 +480,7 @@ local function is_time_to_renew(payload)
     return false
 end
 
-function mod_auth:secure()
+function _M:secure()
     ngx.log(ngx.INFO, "about executing afip.mod_auth.secure ...")
 
     local jwt_token, err = get_jwt_from_cookie()
@@ -509,4 +509,4 @@ function mod_auth:secure()
     ngx.exit(ngx.status)
 end
 
-return mod_auth
+return _M
