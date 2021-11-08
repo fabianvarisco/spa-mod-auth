@@ -1,6 +1,6 @@
 -- https://leafo.net/guides/customizing-the-luarocks-tree.html
 -- luarocks install lua-resty-openssl --local
---  sudo apt-get install luajit
+-- sudo apt-get install luajit
 
 print(package.path)
 
@@ -15,6 +15,7 @@ package.loaded.ngx = {
 
 ngx = require("ngx")
 
+--[[
 local version=require "resty.openssl.version"
 
 print("VERSION:")
@@ -41,3 +42,17 @@ print(string.rep("-", 64))
 -- local mod_auth = require("afip.mod_auth")
 
 -- mod_auth.validate_token_sign("x", "x", {})
+]]
+
+
+-- https://github.com/daurnimator/lua-http
+-- sudo apt-get install lua5.3-dev
+-- luarocks install http --local
+
+local http_request = require "http.request"
+local headers, stream = assert(http_request.new_from_uri("http://localhome:8000"):go())
+local body = assert(stream:get_body_as_string())
+if headers:get ":status" ~= "200" then
+    error(body)
+end
+print(body)
