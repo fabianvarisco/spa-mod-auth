@@ -13,7 +13,7 @@ runtest:
 logs:
 	docker exec -it nginx-proxy tail -1000 -f /usr/local/openresty/nginx/error.log
 
-logs-bff:
+bff-logs:
 	docker exec -it bff tail -1000 -f /usr/local/openresty/nginx/error.log
 
 bff-hello:
