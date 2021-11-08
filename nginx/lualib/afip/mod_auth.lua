@@ -2,6 +2,7 @@
 TODO:
 1. avoid for ever session
 2. more json claim specs
+3. add payload.ip
 ]]
 
 local _M = {}
