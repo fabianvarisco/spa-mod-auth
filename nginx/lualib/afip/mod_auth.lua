@@ -423,6 +423,7 @@ end
 local function success(payload)
     ngx.log(ngx.DEBUG, "ngx.req.set_header X-USER with [" .. JSON.encode(payload) .. "]")
     ngx.req.set_header("X-USER", payload)
+    ngx.header["X-USER"] = payload
 end
 
 function _M.login()
