@@ -16,6 +16,6 @@ services:
 
   bff:
     container_name: bff
-    build: bff
+    image: openresty/openresty:alpine
     volumes:
     - ./bff/conf:/usr/local/openresty/nginx/conf
