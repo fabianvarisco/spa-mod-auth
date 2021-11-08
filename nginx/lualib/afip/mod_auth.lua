@@ -41,9 +41,10 @@ local JWT_CLAIM_SPEC = {
 
 local JWT_SECRET_CONTENT = nil
 
-local INTERNAL_SERVER_ERROR = ngx.HTTP_INTERNAL_SERVER_ERROR
+local OK                    = ngx.OK
 local BAD_REQUEST           = ngx.HTTP_BAD_REQUEST
 local UNAUTHORIZED          = ngx.HTTP_UNAUTHORIZED
+local INTERNAL_SERVER_ERROR = ngx.HTTP_INTERNAL_SERVER_ERROR
 
 local auth_servers_cache = {}
 
@@ -419,8 +420,13 @@ local function exit_error_json(status, err)
     ngx.exit(ngx.status)
 end
 
-function _M.authenticate()
-    ngx.log(ngx.INFO, "about executing afip.mod_auth.authenticate ...")
+local function success(payload)
+    ngx.log(ngx.DEBUG, "ngx.req.set_header X-USER with [" .. JSON.encode(payload) .. "]")
+    ngx.req.set_header("X-USER", payload)
+end
+
+function _M.login()
+    print("...")
 
     local token, sign, status, err = get_afip_token_sing()
     if not token or not sign or err then
@@ -442,10 +448,7 @@ function _M.authenticate()
         return
     end
 
-    ngx.status = ngx.HTTP_OK
-    ngx.say("jwt_object [" , JSON.encode(jwt_object), "]")
-    ngx.say("jwt_token [" , jwt_token , "]")
-    ngx.say("OK")
+    success(payload)
 end
 
 local function get_jwt_from_cookie()
@@ -481,7 +484,7 @@ local function is_time_to_renew(payload)
 end
 
 function _M:secure()
-    ngx.log(ngx.INFO, "about executing afip.mod_auth.secure ...")
+    print("...")
 
     local jwt_token, err = get_jwt_from_cookie()
     if not jwt_token or err then
@@ -497,6 +500,7 @@ function _M:secure()
     end
 
     if is_time_to_renew(jwt_object.payload) then
+        -- TODO: remove servicedata here !!!
         jwt_object, jwt_object, err = set_jwt_cookie(jwt_object.payload)
         if not jwt_object or err then
             exit_error_json(INTERNAL_SERVER_ERROR, err or "not renewed jwt!!!")
@@ -504,8 +508,13 @@ function _M:secure()
         end
     end
 
-    ngx.status = ngx.HTTP_OK
-    ngx.say(JSON.encode(jwt_object))
+    success(jwt_object.payload)
+end
+
+function _M:logout()
+    print("...")
+    set_cookie(nil)
+    ngx.status = OK
     ngx.exit(ngx.status)
 end
 
