@@ -27,6 +27,7 @@ OPTS.JWT_COOKIE_NAME        = os.getenv("JWT_COOKIE_NAME")         or "afip_jwt_
 OPTS.JWT_COOKIE_PATH        = os.getenv("JWT_COOKIE_PATH")         or "/"
 OPTS.JWT_COOKIE_DOMAIN      = os.getenv("JWT_COOKIE_DOMAIN")       or ngx.var.http_host
 OPTS.JWT_TIMEIN_SECONDS     = os.getenv("JWT_TIMEIN_SECONDS")      or (60*5) -- five minutes
+OPTS.HEADER_NAME            = os.getenv("HEADER_NAME")             or "x-afip-user"
 
 ngx.log(ngx.INFO, "with options [" .. JSON.encode(OPTS) .. "]")
 
@@ -420,10 +421,11 @@ local function exit_error_json(status, err)
     ngx.exit(ngx.status)
 end
 
-local function success(payload)
-    ngx.log(ngx.DEBUG, "ngx.req.set_header X-USER with [" .. JSON.encode(payload) .. "]")
-    ngx.req.set_header("X-USER", payload)
-    ngx.header["X-USER"] = payload
+local function set_header(value)
+    local name = OPTS.HEADER_NAME
+    ngx.log(ngx.DEBUG, "ngx.req.set_header [" .. name .. "] with [" .. JSON.encode(value) .. "]")
+    ngx.req.set_header(name, value)
+    ngx.header[name] = value
 end
 
 function _M.login()
@@ -449,7 +451,7 @@ function _M.login()
         return
     end
 
-    success(payload)
+    set_header(payload)
 end
 
 local function get_jwt_from_cookie()
@@ -509,7 +511,7 @@ function _M:secure()
         end
     end
 
-    success(jwt_object.payload)
+    set_header(jwt_object.payload)
 end
 
 function _M:logout()

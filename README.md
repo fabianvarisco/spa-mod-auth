@@ -12,6 +12,7 @@ https://github.com/manoelcampos/xml2lua
 
 https://openresty.org/download/agentzh-nginx-tutorials-en.html
 
+http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_pass
 
 ---
 
