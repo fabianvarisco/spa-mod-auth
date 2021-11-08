@@ -60,8 +60,25 @@ done
 data="foo=foo&bar=bar&token=$(cat "${TMP_DIR}"sso.xml.base64)&sign=$(cat "${TMP_DIR}"sign.base64)"
 readonly data
 
-curl -v -i --data "${data}" -L -c "${TMP_DIR}cookiefile" localhost:8000/login
+# curl -v -i: for more info
 
-curl -i --data '{"someId": 1231, "someValue": "eapp"}' -b "${TMP_DIR}cookiefile" localhost:8000/secure
+curl localhost:8000/nginx-hello
 
-echo "OK!!!"
+curl localhost:8000/api/public/hello
+
+curl \
+     --data "${data}" \
+     -L \
+     -c "${TMP_DIR}cookiefile" \
+     localhost:8000/api/login
+
+curl \
+     --data '{"someId": 1231, "someValue": "eapp"}' \
+     -c "${TMP_DIR}cookiefile" \
+     -b "${TMP_DIR}cookiefile" \
+     localhost:8000/api/secure
+
+curl \
+     -c "${TMP_DIR}cookiefile" \
+     -b "${TMP_DIR}cookiefile" \
+     localhost:8000/api/logout
