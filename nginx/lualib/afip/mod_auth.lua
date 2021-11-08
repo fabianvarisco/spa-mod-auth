@@ -2,7 +2,6 @@
 TODO:
 1. avoid for ever session
 2. more json claim specs
-3. add payload.ip
 ]]
 
 local _M = {}
@@ -339,6 +338,7 @@ local function make_jwt(payload)
     payload.iat = ngx.time()
     payload.exp = payload.iat + OPTS.JWT_EXP_SECONDS
     payload.jti = JIT_UUID()
+    payload.remote_addr = ngx.var.remote_addr
 
     local assertion = {
       header = { typ = "JWT", alg = "HS512" },
