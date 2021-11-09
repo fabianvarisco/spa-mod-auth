@@ -2,6 +2,7 @@
 TODO:
 1. avoid for ever session
 2. more json claim specs
+3. servicedata
 ]]
 
 local _M = {}
@@ -27,6 +28,7 @@ OPTS.JWT_COOKIE_NAME        = os.getenv("JWT_COOKIE_NAME")         or "afip_jwt_
 OPTS.JWT_COOKIE_PATH        = os.getenv("JWT_COOKIE_PATH")         or "/"
 OPTS.JWT_COOKIE_DOMAIN      = os.getenv("JWT_COOKIE_DOMAIN")       or ngx.var.http_host
 OPTS.JWT_TIMEIN_SECONDS     = os.getenv("JWT_TIMEIN_SECONDS")      or (60*5) -- five minutes
+OPTS.SERVICE_NAME           = os.getenv("SERVICE_NAME")            -- mandatory
 
 ngx.log(ngx.INFO, "with options [" .. JSON.encode(OPTS) .. "]")
 
@@ -277,6 +279,15 @@ local function verify_sso_xml_token(token, sign)
     if not login._attr.service then
         return nil, BAD_REQUEST, "invalid sso.operation.login.service"
     end
+
+    if not OPTS.SERVICE_NAME then
+        return nil, INTERNAL_SERVER_ERROR, "OPTS.SERVICE_NAME unsetting!!!"
+    end
+
+    if login._attr.service ~= OPTS.SERVICE_NAME then
+        return nil, BAD_REQUEST, "invalid sso.operation.login.service [" .. login._attr.service .. "] expected [" .. OPTS.SERVICE_NAME .. "]"
+    end
+
     sso_payload.service = login._attr.service
     sso_payload.uid     = login._attr.uid -- mandatory?
 
