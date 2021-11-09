@@ -27,7 +27,6 @@ OPTS.JWT_COOKIE_NAME        = os.getenv("JWT_COOKIE_NAME")         or "afip_jwt_
 OPTS.JWT_COOKIE_PATH        = os.getenv("JWT_COOKIE_PATH")         or "/"
 OPTS.JWT_COOKIE_DOMAIN      = os.getenv("JWT_COOKIE_DOMAIN")       or ngx.var.http_host
 OPTS.JWT_TIMEIN_SECONDS     = os.getenv("JWT_TIMEIN_SECONDS")      or (60*5) -- five minutes
-OPTS.HEADER_NAME            = os.getenv("HEADER_NAME")             or "x-afip-user"
 
 ngx.log(ngx.INFO, "with options [" .. JSON.encode(OPTS) .. "]")
 
@@ -423,10 +422,9 @@ local function exit_error_json(status, err)
 end
 
 local function set_header(value)
-    local name = OPTS.HEADER_NAME
-    ngx.log(ngx.DEBUG, "ngx.req.set_header [" .. name .. "] with [" .. JSON.encode(value) .. "]")
-    ngx.req.set_header(name, value)
-    ngx.header[name] = value
+    local string_value = JSON.encode(value)
+    local base64_string_value = ngx.encode_base64(string_value)
+    ngx.var.payload = base64_string_value
 end
 
 function _M.login()
