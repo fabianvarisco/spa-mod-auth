@@ -6,7 +6,7 @@ BASE="$(dirname "$0")"
 readonly BASE
 
 readonly AUTH_SERVER_CN="www.example.com"
-readonly SERVICE_CN="fe-webapp-bff"
+readonly SERVICE_CN="fe-webapp"
 readonly SSO_TEST_XML="$BASE/sso.test.xml"
 readonly JWT_SECRET_TXT="$BASE/jwtsecret.txt"
 readonly AUTH_SERVER_PRIVATE_KEY_PEM="$BASE/$AUTH_SERVER_CN.privatekey.pem"
