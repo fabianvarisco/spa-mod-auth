@@ -1,7 +1,6 @@
 --[[
 TODO:
-1. avoid for ever session
-2. more json claim specs
+1. avoid for ever session checking sso_gen_time
 3. servicedata
 ]]
 
@@ -32,13 +31,17 @@ OPTS.SERVICE_NAME           = os.getenv("SERVICE_NAME")            -- mandatory
 
 ngx.log(ngx.INFO, "with options [" .. JSON.encode(OPTS) .. "]")
 
--- TODO: more specs
 local JWT_CLAIM_SPEC = {
+    -- https://auth0.com/docs/security/tokens/json-web-tokens/json-web-token-claims#reserved-claims
     jti = JWT_VALIDATORS.required(),
     iat = JWT_VALIDATORS.required(),
+    sub = JWT_VALIDATORS.required(),
     exp = JWT_VALIDATORS.is_not_expired(),
-    dst = JWT_VALIDATORS.required(),
-    src = JWT_VALIDATORS.required(),
+    aud = JWT_VALIDATORS.equals(OPTS.SERVICE_NAME),
+    -- custom claims
+    sso_unique_id = JWT_VALIDATORS.required(),
+    sso_gen_time  = JWT_VALIDATORS.required(),
+    sso_exp_time  = JWT_VALIDATORS.required(),
 }
 
 local JWT_SECRET_CONTENT = nil
@@ -214,10 +217,9 @@ local function verify_sso_xml_token(token, sign)
     if not sso.id._attr.src then
         return nil, BAD_REQUEST, "empty sso.id.src"
     end
-    sso_payload.src = sso.id._attr.src
 
     local authserver_publickey
-    authserver_publickey, err = get_authserver_publickey(sso_payload.src)
+    authserver_publickey, err = get_authserver_publickey(sso.id._attr.src)
     if err then
         return nil, BAD_REQUEST, err
     end
@@ -246,12 +248,18 @@ local function verify_sso_xml_token(token, sign)
     if not sso.id._attr.unique_id then
         return nil, BAD_REQUEST, "empty sso.id.unique_id"
     end
-    sso_payload.unique_id = sso.id._attr.unique_id
+    sso_payload.sso_unique_id = sso.id._attr.unique_id
 
     if not sso.id._attr.dst then
         return nil, BAD_REQUEST, "empty sso.id.dst"
     end
-    sso_payload.dst = sso.id._attr.dst
+    -- TODO: check dst.cn equals OPTS.SERVICE_NAME
+    -- sso_payload.dst = sso.id._attr.dst
+
+    if not sso.id._attr.gen_time then
+        return nil, BAD_REQUEST, "empty sso.id.gen_time"
+    end
+    sso_payload.sso_gen_time = sso.id._attr.gen_time
 
     if not sso.id._attr.exp_time then
         return nil, BAD_REQUEST, "empty sso.id.exp_time"
@@ -288,8 +296,11 @@ local function verify_sso_xml_token(token, sign)
         return nil, BAD_REQUEST, "invalid sso.operation.login.service [" .. login._attr.service .. "] expected [" .. OPTS.SERVICE_NAME .. "]"
     end
 
-    sso_payload.service = login._attr.service
-    sso_payload.uid     = login._attr.uid -- mandatory?
+    -- jwt reserved claim
+    -- aud (audience): Recipient for which the JWT is intended
+    sso_payload.aud = login._attr.service
+    -- sub (subject): Subject of the JWT (the user)
+    sso_payload.sub = login._attr.uid -- mandatory?
 
     sso_payload.groups = {}
     if login.groups and login.groups.group then
@@ -326,6 +337,10 @@ local function verify_sso_xml_token(token, sign)
             if info._attr and info._attr.name and info._attr.value then
                 sso_payload.info[info._attr.name] = info._attr.value
             end
+        end
+
+        if sso_payload.info["cuit"] then
+            sso_payload.sub = sso_payload.info["cuit"]
         end
     end
 
