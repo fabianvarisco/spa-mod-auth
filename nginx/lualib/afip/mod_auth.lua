@@ -427,32 +427,6 @@ local function set_header(value)
     ngx.var.payload = base64_string_value
 end
 
-function _M.login()
-    print("...")
-
-    local token, sign, status, err = get_afip_token_sing()
-    if not token or not sign or err then
-        exit_error_json(status, err or "not token or not sign!!!" )
-        return
-    end
-
-    local payload
-    payload, status, err = verify_sso_xml_token(token, sign)
-    if not payload or err then
-        exit_error_json(status, err or "not payload!!!")
-        return
-    end
-
-    local jwt_token, jwt_object
-    jwt_token, jwt_object, err = set_jwt_cookie(payload)
-    if not jwt_token or not jwt_object or err then
-        exit_error_json(INTERNAL_SERVER_ERROR, err or "not jwt !!!")
-        return
-    end
-
-    set_header(payload)
-end
-
 local function get_jwt_from_cookie()
     -- https://github.com/cloudflare/lua-resty-cookie
     local cookie, err = COOKIE:new()
@@ -483,6 +457,32 @@ local function is_time_to_renew(payload)
 
     ngx.log(ngx.DEBUG, "jti [" .. jti .. "] will not be renewed yet")
     return false
+end
+
+function _M.login()
+    print("...")
+
+    local token, sign, status, err = get_afip_token_sing()
+    if not token or not sign or err then
+        exit_error_json(status, err or "not token or not sign!!!" )
+        return
+    end
+
+    local payload
+    payload, status, err = verify_sso_xml_token(token, sign)
+    if not payload or err then
+        exit_error_json(status, err or "not payload!!!")
+        return
+    end
+
+    local jwt_token, jwt_object
+    jwt_token, jwt_object, err = set_jwt_cookie(payload)
+    if not jwt_token or not jwt_object or err then
+        exit_error_json(INTERNAL_SERVER_ERROR, err or "not jwt !!!")
+        return
+    end
+
+    set_header(payload)
 end
 
 function _M:secure()
