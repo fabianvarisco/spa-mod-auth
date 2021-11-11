@@ -1,9 +1,3 @@
---[[
-TODO:
-1. avoid for ever session checking sso_gen_time
-3. servicedata
-]]
-
 local _M = {}
 
 local ngx            = ngx
